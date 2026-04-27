@@ -2,6 +2,33 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Provider } from '../types';
 
+const LANGUAGES = [
+  'Afrikaans', 'Albanian', 'Amharic', 'Arabic', 'Armenian', 'Azerbaijani',
+  'Basque', 'Belarusian', 'Bengali', 'Bosnian', 'Bulgarian',
+  'Catalan', 'Chinese (Simplified)', 'Chinese (Traditional)', 'Croatian', 'Czech',
+  'Danish', 'Dutch',
+  'English', 'Estonian',
+  'Finnish', 'French',
+  'Galician', 'Georgian', 'German', 'Greek', 'Gujarati',
+  'Hebrew', 'Hindi', 'Hungarian',
+  'Icelandic', 'Indonesian', 'Italian',
+  'Japanese',
+  'Kannada', 'Kazakh', 'Khmer', 'Korean',
+  'Lao', 'Latvian', 'Lithuanian',
+  'Macedonian', 'Malay', 'Malayalam', 'Maltese', 'Marathi', 'Mongolian',
+  'Nepali', 'Norwegian',
+  'Persian', 'Polish', 'Portuguese',
+  'Punjabi',
+  'Romanian', 'Russian',
+  'Serbian', 'Sinhala', 'Slovak', 'Slovenian', 'Somali', 'Spanish', 'Swahili', 'Swedish',
+  'Tamil', 'Telugu', 'Thai', 'Turkish',
+  'Ukrainian', 'Urdu', 'Uzbek',
+  'Vietnamese',
+  'Welsh',
+  'Yoruba',
+  'Zulu',
+];
+
 interface Props {
   onClose: () => void;
 }
@@ -11,9 +38,12 @@ export function SettingsModal({ onClose }: Props) {
   const [provider, setProvider] = useState<Provider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
+  const [ollamaModel, setOllamaModel] = useState('llama3');
+  const [outputLanguage, setOutputLanguage] = useState('English');
   const [patMasked, setPatMasked] = useState('');
   const [apiKeyMasked, setApiKeyMasked] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -25,26 +55,39 @@ export function SettingsModal({ onClose }: Props) {
       api_key_set: boolean;
       api_key_masked: string;
       ollama_url: string;
-    }>('get_settings').then((s) => {
-      setPatMasked(s.pat_masked);
-      setApiKeyMasked(s.api_key_masked);
-      setProvider(s.provider as Provider);
-      setOllamaUrl(s.ollama_url);
-    });
+      ollama_model: string;
+      output_language: string;
+    }>('get_settings')
+      .then((s) => {
+        setPatMasked(s.pat_masked);
+        setApiKeyMasked(s.api_key_masked);
+        setProvider(s.provider as Provider);
+        setOllamaUrl(s.ollama_url);
+        setOllamaModel(s.ollama_model);
+        setOutputLanguage(s.output_language);
+      })
+      .catch((e) => setError(`Failed to load settings: ${e}`))
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      await invoke('save_settings', {
+      const result = await invoke<{ keychain_error: string | null }>('save_settings', {
         githubPat: pat || undefined,
         llmProvider: provider,
         llmApiKey: apiKey || undefined,
         ollamaUrl: provider === 'ollama' ? ollamaUrl : undefined,
+        ollamaModel: provider === 'ollama' ? ollamaModel : undefined,
+        outputLanguage: outputLanguage,
       });
-      setSuccess(true);
-      setTimeout(onClose, 800);
+      if (result.keychain_error) {
+        setError(result.keychain_error);
+      } else {
+        setSuccess(true);
+        setTimeout(onClose, 800);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -75,6 +118,10 @@ export function SettingsModal({ onClose }: Props) {
         </div>
 
         <div className="px-6 py-5 space-y-6">
+          {loading && (
+            <div className="text-sm text-[var(--muted)] py-4 text-center">Loading…</div>
+          )}
+          {!loading && <>
           {/* GitHub PAT */}
           <div>
             <div className="text-xs text-[var(--muted)] uppercase tracking-wide mb-3">GitHub</div>
@@ -86,9 +133,15 @@ export function SettingsModal({ onClose }: Props) {
               placeholder={patMasked || 'ghp_…'}
               className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none focus:border-[var(--amber)]"
             />
-            <p className="text-xs text-[var(--muted)] mt-1">
-              Scopes needed: <code>repo</code> (read), <code>read:user</code>
-            </p>
+            {patMasked ? (
+              <p className="text-xs text-green-500/70 mt-1">
+                Saved: {patMasked} — leave blank to keep current
+              </p>
+            ) : (
+              <p className="text-xs text-[var(--muted)] mt-1">
+                Scopes needed: <code>repo</code> (read), <code>read:user</code>
+              </p>
+            )}
           </div>
 
           {/* AI Provider */}
@@ -121,20 +174,61 @@ export function SettingsModal({ onClose }: Props) {
                   placeholder={apiKeyMasked || (provider === 'openai' ? 'sk-…' : 'sk-ant-…')}
                   className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none focus:border-[var(--amber)]"
                 />
+                {apiKeyMasked && (
+                  <p className="text-xs text-green-500/70 mt-1">
+                    Saved: {apiKeyMasked} — leave blank to keep current
+                  </p>
+                )}
               </div>
             )}
 
             {provider === 'ollama' && (
-              <div>
-                <label className="text-sm text-[var(--text)] block mb-1.5">Base URL</label>
-                <input
-                  type="text"
-                  value={ollamaUrl}
-                  onChange={(e) => setOllamaUrl(e.target.value)}
-                  className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--amber)]"
-                />
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm text-[var(--text)] block mb-1.5">Base URL</label>
+                  <input
+                    type="text"
+                    value={ollamaUrl}
+                    onChange={(e) => setOllamaUrl(e.target.value)}
+                    className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--amber)]"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-[var(--text)] block mb-1.5">Model</label>
+                  <input
+                    type="text"
+                    value={ollamaModel}
+                    onChange={(e) => setOllamaModel(e.target.value)}
+                    placeholder="llama3"
+                    className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text)] placeholder-[var(--muted)] outline-none focus:border-[var(--amber)]"
+                  />
+                  <p className="text-xs text-[var(--muted)] mt-1">
+                    Must be pulled locally, e.g. <code>ollama pull llama3.2</code>
+                  </p>
+                </div>
               </div>
             )}
+          </div>
+
+          {/* Output Language */}
+          <div>
+            <div className="text-xs text-[var(--muted)] uppercase tracking-wide mb-3">Description Language</div>
+            <label className="text-sm text-[var(--text)] block mb-1.5">LLM output language</label>
+            <select
+              value={outputLanguage}
+              onChange={(e) => setOutputLanguage(e.target.value)}
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-[var(--amber)]"
+            >
+              {LANGUAGES.map((lang) => (
+                <option key={lang} value={lang}>{lang}</option>
+              ))}
+            </select>
+            <p className="text-xs text-[var(--muted)] mt-1">
+              Applies to <em>what</em>, <em>why</em>, and <em>use case</em> fields. Category and tags stay in English.
+            </p>
+            <p className="text-xs text-[var(--muted)] mt-1">
+              Changing language affects only new descriptions. Use Shift-A to re-describe existing repos.
+            </p>
           </div>
 
           {error && (
@@ -147,6 +241,7 @@ export function SettingsModal({ onClose }: Props) {
               Saved!
             </div>
           )}
+          </>}
         </div>
 
         {/* Footer */}
@@ -159,7 +254,7 @@ export function SettingsModal({ onClose }: Props) {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || loading}
             className="px-4 py-1.5 text-sm bg-[var(--amber)] text-[#0C0C0E] rounded font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
