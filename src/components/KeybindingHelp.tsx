@@ -10,9 +10,30 @@ const BINDINGS = [
   ['o', 'Open in browser'],
   ['/', 'Focus search'],
   ['e', 'Edit notes + category override'],
+  ['w', 'Toggle watching (track releases)'],
+  ['W', 'Open watching list'],
+  ['f', 'Network stars feed'],
   [',', 'Open settings'],
   ['?', 'Show this help'],
   ['Esc', 'Close / cancel / discard'],
+];
+
+const WATCHING_BINDINGS = [
+  ['j / k', 'Navigate'],
+  ['r', 'Open releases page'],
+  ['o', 'Open repo in browser'],
+  ['w', 'Unwatch'],
+  ['Esc', 'Back to library'],
+];
+
+const FEED_BINDINGS = [
+  ['j / k', 'Navigate feed'],
+  ['a', 'Add to library'],
+  ['d', 'Add to library + describe with LLM'],
+  ['x', 'Dismiss'],
+  ['o', 'Open in browser'],
+  ['r', 'Refresh feed'],
+  ['Esc', 'Back to library'],
 ];
 
 export function KeybindingHelp({ onClose }: Props) {
@@ -39,6 +60,32 @@ export function KeybindingHelp({ onClose }: Props) {
               <span className="text-sm text-[var(--muted)]">{desc}</span>
             </div>
           ))}
+        </div>
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+          <p className="text-xs text-[var(--muted)] mb-2 uppercase tracking-wide">Watching view</p>
+          <div className="space-y-2">
+            {WATCHING_BINDINGS.map(([key, desc]) => (
+              <div key={key} className="flex items-center gap-3">
+                <kbd className="flex-shrink-0 min-w-[60px] text-center px-2 py-0.5 bg-[var(--bg)] border border-[var(--border)] rounded text-xs text-[var(--amber)] font-mono">
+                  {key}
+                </kbd>
+                <span className="text-sm text-[var(--muted)]">{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-[var(--border)]">
+          <p className="text-xs text-[var(--muted)] mb-2 uppercase tracking-wide">Feed view</p>
+          <div className="space-y-2">
+            {FEED_BINDINGS.map(([key, desc]) => (
+              <div key={key} className="flex items-center gap-3">
+                <kbd className="flex-shrink-0 min-w-[60px] text-center px-2 py-0.5 bg-[var(--bg)] border border-[var(--border)] rounded text-xs text-[var(--amber)] font-mono">
+                  {key}
+                </kbd>
+                <span className="text-sm text-[var(--muted)]">{desc}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -45,6 +45,9 @@ export function RepoRow({ repo, isSelected, currentPromptVersion, onClick }: Pro
           >
             {repo.full_name}
           </span>
+          {repo.watching && (
+            <span className="text-[var(--amber)] flex-shrink-0 text-xs" title="Watching">●</span>
+          )}
           {isStale && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-[#2a2010] text-[#a06830] flex-shrink-0">
               stale

@@ -21,6 +21,14 @@ pub struct Repo {
     pub prompt_version: Option<i64>,
     pub user_notes: Option<String>,
     pub user_category: Option<String>,
+    pub watching: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LatestRelease {
+    pub tag_name: String,
+    pub published_at: String,
+    pub html_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,4 +81,34 @@ pub struct BatchDescribeResult {
     pub described: u32,
     pub failed: u32,
     pub total: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedGroup {
+    pub repo_full_name: String,
+    pub repo_description: Option<String>,
+    pub repo_url: String,
+    pub repo_language: Option<String>,
+    pub repo_stars_count: Option<i64>,
+    pub starred_by: Vec<String>,
+    pub latest_starred_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedFetchProgress {
+    pub phase: String,
+    pub current_user: Option<String>,
+    pub users_done: u32,
+    pub users_total: u32,
+    pub items_found: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedFetchResult {
+    pub items_found: u32,
+    pub users_checked: u32,
+    pub users_total: u32,
+    pub failed_users: u32,
+    pub cancelled: bool,
+    pub error: Option<String>,
 }

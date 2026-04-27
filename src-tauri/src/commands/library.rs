@@ -7,7 +7,7 @@ use tauri::State;
 const REPO_SELECT: &str =
     "SELECT id, full_name, description, url, language, stars_count, topics, added_at, source,
             llm_summary, llm_what, llm_why, llm_use_case, llm_category, llm_tags, llm_generated_at, prompt_version,
-            user_notes, user_category FROM repos";
+            user_notes, user_category, watching FROM repos";
 
 #[tauri::command]
 pub fn list_repos(
@@ -174,6 +174,37 @@ pub fn update_repo_user_fields(
         repo_from_row,
     )
     .map_err(|e| format!("Failed to read updated repo: {e}"))
+}
+
+#[tauri::command]
+pub fn toggle_watching(repo_id: String, state: State<'_, DbState>) -> Result<Repo, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE repos SET watching = CASE WHEN watching = 1 THEN 0 ELSE 1 END WHERE id = ?1",
+        params![repo_id],
+    )
+    .map_err(|e| format!("DB update failed: {e}"))?;
+
+    conn.query_row(
+        &format!("{} WHERE id = ?1", REPO_SELECT),
+        params![repo_id],
+        repo_from_row,
+    )
+    .map_err(|e| format!("Failed to read updated repo: {e}"))
+}
+
+#[tauri::command]
+pub fn list_watching(state: State<'_, DbState>) -> Result<Vec<Repo>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(&format!("{} WHERE watching = 1 ORDER BY full_name ASC", REPO_SELECT))
+        .map_err(|e| e.to_string())?;
+    let repos: Vec<Repo> = stmt
+        .query_map([], repo_from_row)
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+    Ok(repos)
 }
 
 #[tauri::command]

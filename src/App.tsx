@@ -16,8 +16,11 @@ import { AddRepoModal } from './components/AddRepoModal';
 import { KeybindingHelp } from './components/KeybindingHelp';
 import { ToastBanner } from './components/ToastBanner';
 import { BatchProgress } from './components/BatchProgress';
+import { FeedView } from './components/FeedView';
+import { WatchingView } from './components/WatchingView';
 
 type Modal = 'settings' | 'import' | 'add' | 'help' | null;
+type ViewMode = 'library' | 'feed' | 'watching';
 
 export default function App() {
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -28,6 +31,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [modal, setModal] = useState<Modal>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('library');
 
   // Describing state: set of repo ids currently being described
   const [describing, setDescribing] = useState<Set<string>>(new Set());
@@ -155,6 +159,16 @@ export default function App() {
     }
   }
 
+  async function toggleWatching(repo: Repo) {
+    try {
+      const updated = await invoke<Repo>('toggle_watching', { repoId: repo.id });
+      setRepos((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
+      showToast(updated.watching ? `Watching ${repo.full_name}` : `Unwatched ${repo.full_name}`);
+    } catch (e) {
+      showToast(`Failed: ${e}`, 'error');
+    }
+  }
+
   // Keybindings
   useKeydown(
     useCallback(
@@ -181,6 +195,9 @@ export default function App() {
 
         // Block remaining keybindings if a modal is open or in an input
         if (modal !== null || isInput) return;
+
+        // Feed/watching views handle their own keys
+        if (viewMode === 'feed' || viewMode === 'watching') return;
 
         const repo = repos[selectedIdx];
 
@@ -223,6 +240,15 @@ export default function App() {
           case 'e':
             if (repo && !editingId) setEditingId(repo.id);
             break;
+          case 'f':
+            setViewMode('feed');
+            break;
+          case 'w':
+            if (repo && !editingId) toggleWatching(repo);
+            break;
+          case 'W':
+            setViewMode('watching');
+            break;
           case ',':
             setModal('settings');
             break;
@@ -234,9 +260,9 @@ export default function App() {
             break;
         }
       },
-      [repos, selectedIdx, modal, editingId, describing, batchRunning]
+      [repos, selectedIdx, modal, editingId, describing, batchRunning, viewMode]
     ),
-    [repos, selectedIdx, modal, editingId, describing, batchRunning]
+    [repos, selectedIdx, modal, editingId, describing, batchRunning, viewMode]
   );
 
   async function handleEditSave(notes: string | null, category: string | null) {
@@ -340,75 +366,110 @@ export default function App() {
         </div>
       )}
 
-      {/* Search + category filter */}
-      <SearchBar
-        query={query}
-        onQueryChange={setQuery}
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-        categories={categories}
-        searchRef={searchRef}
-      />
-
-      {/* Repo list */}
-      <div ref={listRef} className="flex-1 overflow-y-auto">
-        {repos.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-sm text-[var(--muted)]">
-            {query ? 'No repos match your search.' : 'Your library is empty.'}
-          </div>
-        ) : (
-          <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-            {rowVirtualizer.getVirtualItems().map((vItem) => {
-              const repo = repos[vItem.index];
-              return (
-                <div
-                  key={repo.id}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    transform: `translateY(${vItem.start}px)`,
-                  }}
-                >
-                  <RepoRow
-                    repo={repo}
-                    isSelected={vItem.index === selectedIdx}
-                    currentPromptVersion={constants.current_prompt_version}
-                    onClick={() => {
-                      setSelectedIdx(vItem.index);
-                      setEditingId(null);
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Bottom panel: edit or detail */}
-      {selectedRepo && (
-        isEditing ? (
-          <EditPanel
-            repo={selectedRepo}
-            onSave={handleEditSave}
-            onDiscard={() => setEditingId(null)}
+      {viewMode === 'feed' ? (
+        <FeedView
+          onBack={() => setViewMode('library')}
+          onRepoAdded={(repo) => {
+            setRepos((rs) => {
+              if (rs.some((r) => r.id === repo.id)) return rs;
+              return [repo, ...rs];
+            });
+            loadCategories();
+          }}
+          showToast={showToast}
+          onDescribeRepo={(repo) => {
+            setViewMode('library');
+            describeRepo(repo);
+          }}
+        />
+      ) : viewMode === 'watching' ? (
+        <WatchingView
+          onBack={() => setViewMode('library')}
+          showToast={showToast}
+          onRepoUpdated={(repo) => setRepos((rs) => rs.map((r) => (r.id === repo.id ? repo : r)))}
+        />
+      ) : (
+        <>
+          {/* Search + category filter */}
+          <SearchBar
+            query={query}
+            onQueryChange={setQuery}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            categories={categories}
+            searchRef={searchRef}
           />
-        ) : (
-          <DetailPanel
-            repo={selectedRepo}
-            isDescribing={isDescribing}
-            currentPromptVersion={constants.current_prompt_version}
-          />
-        )
+
+          {/* Repo list */}
+          <div ref={listRef} className="flex-1 overflow-y-auto">
+            {repos.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-sm text-[var(--muted)]">
+                {query ? 'No repos match your search.' : 'Your library is empty.'}
+              </div>
+            ) : (
+              <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+                {rowVirtualizer.getVirtualItems().map((vItem) => {
+                  const repo = repos[vItem.index];
+                  return (
+                    <div
+                      key={repo.id}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        transform: `translateY(${vItem.start}px)`,
+                      }}
+                    >
+                      <RepoRow
+                        repo={repo}
+                        isSelected={vItem.index === selectedIdx}
+                        currentPromptVersion={constants.current_prompt_version}
+                        onClick={() => {
+                          setSelectedIdx(vItem.index);
+                          setEditingId(null);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom panel: edit or detail */}
+          {selectedRepo && (
+            isEditing ? (
+              <EditPanel
+                repo={selectedRepo}
+                onSave={handleEditSave}
+                onDiscard={() => setEditingId(null)}
+              />
+            ) : (
+              <DetailPanel
+                repo={selectedRepo}
+                isDescribing={isDescribing}
+                currentPromptVersion={constants.current_prompt_version}
+              />
+            )
+          )}
+
+          {/* Status bar */}
+          <div className="flex-shrink-0 flex items-center justify-between px-5 py-1.5 border-t border-[var(--border)] text-xs text-[var(--muted)]">
+            <span>{repos.length} repos</span>
+            <span>
+              <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded">w</kbd>
+              {' '}watch ·{' '}
+              <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded">W</kbd>
+              {' '}watching ·{' '}
+              <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded">f</kbd>
+              {' '}feed ·{' '}
+              <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded">?</kbd>
+              {' '}help
+            </span>
+          </div>
+        </>
       )}
-
-      {/* Status bar */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-1.5 border-t border-[var(--border)] text-xs text-[var(--muted)]">
-        <span>{repos.length} repos</span>
-        <span>Press <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded">?</kbd> for keybindings</span>
-      </div>
 
       {/* Modals */}
       {modal === 'settings' && (

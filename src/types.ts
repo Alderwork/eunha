@@ -18,6 +18,7 @@ export interface Repo {
   prompt_version: number | null;
   user_notes: string | null;
   user_category: string | null;
+  watching: boolean;
 }
 
 export interface CategoryCount {
@@ -56,4 +57,37 @@ export interface BatchDescribeProgress {
   failed: number;
 }
 
+export interface LatestRelease {
+  tag_name: string;
+  published_at: string;
+  html_url: string;
+}
+
 export type Provider = 'openai' | 'anthropic' | 'ollama';
+
+export interface FeedGroup {
+  repo_full_name: string;
+  repo_description: string | null;
+  repo_url: string;
+  repo_language: string | null;
+  repo_stars_count: number | null;
+  starred_by: string[];
+  latest_starred_at: string;
+}
+
+export interface FeedFetchProgress {
+  phase: string;
+  current_user: string | null;
+  users_done: number;
+  users_total: number;
+  items_found: number;
+}
+
+export interface FeedFetchResult {
+  items_found: number;
+  users_checked: number;
+  users_total: number;
+  failed_users: number;
+  cancelled: boolean;
+  error: string | null;
+}

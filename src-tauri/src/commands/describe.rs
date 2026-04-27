@@ -1,4 +1,4 @@
-use crate::db::DbState;
+use crate::db::{migrations, DbState};
 use crate::models::{BatchDescribeResult, LlmResult, Repo};
 use rusqlite::{params, Connection};
 use serde::Deserialize;
@@ -115,7 +115,7 @@ async fn call_llm(
     provider: &str,
     api_key: &str,
     ollama_url: Option<&str>,
-    _model: Option<&str>,
+    model: Option<&str>,
 ) -> Result<String, String> {
     let client = reqwest::Client::new();
 
@@ -178,8 +178,9 @@ async fn call_llm(
         }
         "ollama" => {
             let base = ollama_url.unwrap_or("http://localhost:11434");
+            let model = model.unwrap_or("llama3");
             let body = serde_json::json!({
-                "model": "llama3",
+                "model": model,
                 "prompt": prompt,
                 "format": "json",
                 "stream": false
@@ -242,13 +243,21 @@ pub fn write_llm_description(
     tx.commit()
 }
 
-fn build_prompt(repo: &Repo, readme: Option<&str>) -> String {
+fn build_prompt(repo: &Repo, readme: Option<&str>, output_language: &str) -> String {
     let topics = repo
         .topics
         .as_deref()
         .and_then(|t| serde_json::from_str::<Vec<String>>(t).ok())
         .map(|v| v.join(", "))
         .unwrap_or_default();
+
+    let lang_instruction = if output_language == "English" {
+        String::new()
+    } else {
+        format!(
+            "\nWrite the \"what\", \"why\", and \"use_case\" values in {output_language}. Keep \"category\" and \"tags\" in English."
+        )
+    };
 
     format!(
         r#"Given this GitHub repo:
@@ -257,7 +266,7 @@ fn build_prompt(repo: &Repo, readme: Option<&str>) -> String {
 - Language: {language}
 - Topics: {topics}
 - README excerpt: {readme}
-
+{lang_instruction}
 Respond ONLY with valid JSON in this exact format:
 {{
   "what": "One sentence: what this repo IS (max 80 chars)",
@@ -271,27 +280,23 @@ Respond ONLY with valid JSON in this exact format:
         language = repo.language.as_deref().unwrap_or(""),
         topics = topics,
         readme = readme.unwrap_or("[not available]"),
+        lang_instruction = lang_instruction,
     )
 }
 
-pub fn get_llm_settings() -> Result<(String, String, Option<String>, String), String> {
-    let get = |key: &str| -> Option<String> {
-        keyring::Entry::new("eunha", key)
-            .ok()
-            .and_then(|e| e.get_password().ok())
-            .filter(|s| !s.is_empty())
-    };
-
-    let provider = get("llm_provider").unwrap_or_else(|| "openai".to_string());
-    let api_key = get("llm_api_key").unwrap_or_default();
-    let ollama_url = get("ollama_url");
-    let pat = get("github_pat").unwrap_or_default();
+pub fn get_llm_settings(conn: &rusqlite::Connection) -> Result<(String, String, Option<String>, Option<String>, String), String> {
+    let provider = migrations::settings_get(conn, "llm_provider")
+        .unwrap_or_else(|| "openai".to_string());
+    let api_key = crate::commands::settings::get_secret("llm_api_key").unwrap_or_default();
+    let ollama_url = migrations::settings_get(conn, "ollama_url");
+    let ollama_model = migrations::settings_get(conn, "ollama_model");
+    let pat = crate::commands::settings::get_secret("github_pat").unwrap_or_default();
 
     if api_key.is_empty() && provider != "ollama" {
         return Err("LLM API key not set. Open Settings (,) to add your key.".to_string());
     }
 
-    Ok((provider, api_key, ollama_url, pat))
+    Ok((provider, api_key, ollama_url, ollama_model, pat))
 }
 
 pub fn repo_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Repo> {
@@ -315,13 +320,14 @@ pub fn repo_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Repo> {
         prompt_version: row.get(16)?,
         user_notes: row.get(17)?,
         user_category: row.get(18)?,
+        watching: row.get::<_, i64>(19).unwrap_or(0) != 0,
     })
 }
 
-const REPO_SELECT: &str =
+pub(crate) const REPO_SELECT: &str =
     "SELECT id, full_name, description, url, language, stars_count, topics, added_at, source,
             llm_summary, llm_what, llm_why, llm_use_case, llm_category, llm_tags, llm_generated_at, prompt_version,
-            user_notes, user_category FROM repos";
+            user_notes, user_category, watching FROM repos";
 
 #[tauri::command]
 pub async fn describe_repo(
@@ -339,7 +345,16 @@ pub async fn describe_repo(
         .map_err(|e| format!("Repo not found: {e}"))?
     };
 
-    let (provider, api_key, ollama_url, pat) = get_llm_settings()?;
+    let (provider, api_key, ollama_url, ollama_model, pat) = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        get_llm_settings(&conn)?
+    };
+
+    let output_language = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        migrations::settings_get(&conn, "output_language")
+            .unwrap_or_else(|| "English".to_string())
+    };
 
     let readme = if !pat.is_empty() {
         tokio::time::timeout(
@@ -352,11 +367,11 @@ pub async fn describe_repo(
         None
     };
 
-    let prompt = build_prompt(&repo, readme.as_deref());
+    let prompt = build_prompt(&repo, readme.as_deref(), &output_language);
 
     let raw = tokio::time::timeout(
         std::time::Duration::from_secs(30),
-        call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), None),
+        call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), ollama_model.as_deref()),
     )
     .await
     .map_err(|_| "Describe timed out after 30s".to_string())??;
@@ -404,7 +419,16 @@ pub async fn batch_describe(
     let mut described = 0u32;
     let mut failed = 0u32;
 
-    let (provider, api_key, ollama_url, pat) = get_llm_settings()?;
+    let (provider, api_key, ollama_url, ollama_model, pat) = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        get_llm_settings(&conn)?
+    };
+
+    let output_language = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        migrations::settings_get(&conn, "output_language")
+            .unwrap_or_else(|| "English".to_string())
+    };
 
     for (i, repo) in repos.iter().enumerate() {
         let _ = app.emit(
@@ -428,11 +452,11 @@ pub async fn batch_describe(
             None
         };
 
-        let prompt = build_prompt(repo, readme.as_deref());
+        let prompt = build_prompt(repo, readme.as_deref(), &output_language);
 
         let raw_result = tokio::time::timeout(
             std::time::Duration::from_secs(30),
-            call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), None),
+            call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), ollama_model.as_deref()),
         )
         .await;
 
@@ -443,7 +467,7 @@ pub async fn batch_describe(
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     match tokio::time::timeout(
                         std::time::Duration::from_secs(30),
-                        call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), None),
+                        call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), ollama_model.as_deref()),
                     )
                     .await
                     {
@@ -526,5 +550,50 @@ mod tests {
         );
         let result = parse_llm_json(&json).unwrap();
         assert_eq!(result.what.chars().count(), 80);
+    }
+
+    fn make_test_repo() -> Repo {
+        Repo {
+            id: "test/repo".to_string(),
+            full_name: "test/repo".to_string(),
+            description: None,
+            url: "https://github.com/test/repo".to_string(),
+            language: None,
+            stars_count: None,
+            topics: None,
+            added_at: None,
+            source: "manual".to_string(),
+            llm_summary: None,
+            llm_what: None,
+            llm_why: None,
+            llm_use_case: None,
+            llm_category: None,
+            llm_tags: None,
+            llm_generated_at: None,
+            prompt_version: None,
+            user_notes: None,
+            user_category: None,
+            watching: false,
+        }
+    }
+
+    #[test]
+    fn build_prompt_includes_language_instruction_for_non_english() {
+        let repo = make_test_repo();
+        let prompt = build_prompt(&repo, None, "Japanese");
+        assert!(
+            prompt.contains("in Japanese"),
+            "Expected 'in Japanese' in prompt but got:\n{prompt}"
+        );
+    }
+
+    #[test]
+    fn build_prompt_has_no_language_instruction_for_english() {
+        let repo = make_test_repo();
+        let prompt = build_prompt(&repo, None, "English");
+        assert!(
+            !prompt.contains("in English"),
+            "Unexpected language instruction in English prompt:\n{prompt}"
+        );
     }
 }
