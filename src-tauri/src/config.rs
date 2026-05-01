@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub github_pat: Option<String>,
     pub llm_api_key: Option<String>,
+    pub onboarded_at: Option<String>,
 }
 
 fn config_path() -> PathBuf {
@@ -53,5 +54,15 @@ pub fn set_secret(key: &str, value: &str) -> Result<(), String> {
         "llm_api_key" => config.llm_api_key = Some(value.to_string()),
         _ => return Err(format!("Unknown secret key: {key}")),
     }
+    write(&config)
+}
+
+pub fn get_onboarded_at() -> Option<String> {
+    read().onboarded_at.filter(|s| !s.is_empty())
+}
+
+pub fn set_onboarded_at(value: &str) -> Result<(), String> {
+    let mut config = read();
+    config.onboarded_at = Some(value.to_string());
     write(&config)
 }
