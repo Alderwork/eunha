@@ -5,3 +5,4 @@ src-tauri/target/
 *.swp
 .gstack/
 .worktrees/
+.superpowers/
