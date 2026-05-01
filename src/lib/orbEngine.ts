@@ -31,6 +31,7 @@ export class OrbEngine {
   attach(canvas: HTMLCanvasElement, dpr: number): void {
     this.canvas = canvas;
     this.dpr = dpr;
+    // Note: DPR is captured once. Remount engine to handle external display changes.
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       throw new Error('Canvas 2D context unavailable');
@@ -54,6 +55,9 @@ export class OrbEngine {
   }
 
   setScene(target: SceneParams, transitionMs: number = 600): void {
+    if (!this.canvas) return;
+    // Note: calling setScene mid-transition restarts the lerp from current values toward the new target.
+    // This produces a brief velocity discontinuity in animations but matches the design intent.
     if (this.reducedMotion) {
       this.current = { ...target };
       this.target = { ...target };
@@ -65,6 +69,7 @@ export class OrbEngine {
   }
 
   spawn(n: number): void {
+    if (!this.canvas) return;
     if (this.reducedMotion) return;
     this.spawnQueue += n;
   }
