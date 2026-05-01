@@ -6,7 +6,8 @@ export type StageHandle = {
   engine: OrbEngine | null;
 };
 
-export const Stage = forwardRef<StageHandle, Record<string, never>>(function Stage(_, ref) {
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export const Stage = forwardRef<StageHandle, {}>(function Stage(_, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<OrbEngine | null>(null);
   const reducedMotion = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
