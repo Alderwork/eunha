@@ -25,6 +25,7 @@ import { ReadmeView, ReadmeTab } from './components/ReadmeView';
 import { CategorySidebar } from './components/CategorySidebar';
 import { Button } from './components/ui/Button';
 import { Kbd } from './components/ui/Kbd';
+import { OnboardingFlow, type OnboardingCompleteOpts } from './components/onboarding/OnboardingFlow';
 import { getRowHeight } from './lib/visuals';
 import eunhaLogo from './assets/eunha-orb.png';
 
@@ -84,6 +85,9 @@ export default function App() {
   const [toast, setToast] = useState<{ msg: string; type: 'info' | 'error' | 'warn' } | null>(null);
   const [keychainError, setKeychainError] = useState<string | null>(null);
   const [patMissing, setPatMissing] = useState(false);
+
+  const [onboardingState, setOnboardingState] = useState<'loading' | 'show' | 'done'>('loading');
+  const [pendingAddModal, setPendingAddModal] = useState(false);
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('eunha-theme') as 'dark' | 'light' | null;
@@ -159,6 +163,14 @@ export default function App() {
   }
 
   useEffect(() => {
+    invoke<string | null>('get_onboarded_at')
+      .then((value) => {
+        setOnboardingState(value ? 'done' : 'show');
+      })
+      .catch(() => {
+        setOnboardingState('show');
+      });
+
     invoke<AppConstants>('get_app_constants').then(setConstants);
 
     invoke<{ pat_set: boolean; pat_masked: string; provider: string; api_key_set: boolean; api_key_masked: string; ollama_url: string }>('get_settings')
@@ -205,6 +217,13 @@ export default function App() {
     rowVirtualizer.measure();
     rowVirtualizer.scrollToIndex(selectedIdx, { align: 'auto' });
   }, [selectedIdx]);
+
+  useEffect(() => {
+    if (onboardingState === 'done' && pendingAddModal) {
+      setModal('add');
+      setPendingAddModal(false);
+    }
+  }, [onboardingState, pendingAddModal]);
 
   const showCategories = (viewMode === 'library' || viewMode === 'watching') && categories.length > 0;
 
@@ -547,6 +566,18 @@ export default function App() {
     [repos, selectedIdx, modal, editingId, describing, batchRunning, viewMode, readmeTabs, activeReadmeTabId, splitPane, focusedSide]
   );
 
+  async function handleOnboardingComplete(opts: OnboardingCompleteOpts) {
+    try {
+      await invoke('set_onboarded_at');
+    } catch (e) {
+      showToast(`Could not save onboarding state — ${e}`, 'error');
+    }
+    if (opts.openAddModal) {
+      setPendingAddModal(true);
+    }
+    setOnboardingState('done');
+  }
+
   async function handleEditSave(notes: string | null, category: string | null, locked: boolean) {
     if (!selectedRepo) return;
     try {
@@ -581,6 +612,13 @@ export default function App() {
       getCurrentWindow().startDragging();
     }
   }, []);
+
+  if (onboardingState === 'loading') {
+    return <div className="h-screen bg-bg" />;
+  }
+  if (onboardingState === 'show') {
+    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-bg">
@@ -640,30 +678,6 @@ export default function App() {
           </Button>
         </div>
       </div>
-
-      {/* First-launch interstitial */}
-      {patMissing && repos.length === 0 && (
-        <div className="flex-shrink-0 border-b border-border bg-panel px-5 py-5 text-center">
-          <p className="text-sm text-ink mb-3">
-            Welcome to eunha. Set up your GitHub token to import stars.
-          </p>
-          <div className="flex justify-center gap-3">
-            <Button
-              variant="primary"
-              onClick={() => setModal('settings')}
-              className="text-sm px-4 py-1.5"
-            >
-              Open Settings
-            </Button>
-            <Button
-              onClick={() => setModal('add')}
-              className="text-sm px-4 py-1.5"
-            >
-              Add a repo manually
-            </Button>
-          </div>
-        </div>
-      )}
 
       <main className="flex flex-row flex-1 overflow-hidden">
         {/* Left sidebar */}
