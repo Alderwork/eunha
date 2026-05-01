@@ -5,6 +5,7 @@ pub mod describe;
 pub mod feed;
 pub mod import;
 pub mod library;
+pub mod onboarding;
 pub mod readme;
 pub mod releases;
 pub mod settings;

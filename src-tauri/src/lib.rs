@@ -67,6 +67,9 @@ pub fn run() {
             commands::releases::mark_all_releases_read,
             commands::releases::get_unread_release_count,
             commands::releases::list_watched_repos_with_unread,
+            commands::onboarding::get_onboarded_at,
+            commands::onboarding::set_onboarded_at,
+            commands::onboarding::validate_pat,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
