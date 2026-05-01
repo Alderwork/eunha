@@ -189,10 +189,40 @@ export class OrbEngine {
     this.particles = next;
   }
   private render(): void {
-    // Filled in Task 7.
     const ctx = this.ctx!;
     const canvas = this.canvas!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    void this.dpr;
+    const w = canvas.width / this.dpr;
+    const h = canvas.height / this.dpr;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    // Soft fade instead of hard clear — produces motion trails.
+    const fadeAlpha = this.current.trailLength <= 0 ? 1 : 0.18 + (8 - Math.min(8, this.current.trailLength)) * 0.06;
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = `rgba(0,0,0,${fadeAlpha})`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Orb glow (outer, soft)
+    const glowR = 80 * this.current.orbGlowMultiplier;
+    const glow = ctx.createRadialGradient(cx, cy, 20, cx, cy, glowR);
+    glow.addColorStop(0,    'rgba(113,112,255,0.35)');
+    glow.addColorStop(0.5,  'rgba(94,106,210,0.15)');
+    glow.addColorStop(1,    'rgba(94,106,210,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Orb body (the canvas overlays the SVG/PNG orb sitting underneath; we only paint glow + particles here)
+
+    // Particles
+    for (const p of this.particles) {
+      const alpha = Math.max(0, Math.min(1, p.life));
+      ctx.fillStyle = `rgba(221,238,255,${alpha})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
