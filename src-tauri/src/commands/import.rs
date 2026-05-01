@@ -146,6 +146,7 @@ pub async fn import_stars(
     let mut total_imported = 0u32;
     let mut total_skipped = 0u32;
     let mut pages_fetched = 0u32;
+    let mut prev_repos_total: u32 = 0;
 
     loop {
         if cancel.0.load(Ordering::SeqCst) {
@@ -193,12 +194,16 @@ pub async fn import_stars(
 
         pages_fetched += 1;
 
+        let repos_total = total_imported + total_skipped;
+        let delta = repos_total.saturating_sub(prev_repos_total);
+        prev_repos_total = repos_total;
         let _ = app.emit(
             "import:progress",
             serde_json::json!({
                 "page": page,
                 "total_pages": total_pages,
-                "repos_fetched": total_imported + total_skipped,
+                "repos_fetched": repos_total,
+                "delta": delta,
             }),
         );
 
