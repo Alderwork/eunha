@@ -217,29 +217,62 @@ pub fn write_llm_description(
     result: &LlmResult,
 ) -> rusqlite::Result<()> {
     let tags_json = serde_json::to_string(&result.tags).unwrap_or_default();
+
+    let locked: bool = conn
+        .query_row(
+            "SELECT category_locked FROM repos WHERE id = ?1",
+            params![repo_id],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap_or(0)
+        != 0;
+
     let tx = conn.unchecked_transaction()?;
-    tx.execute(
-        "UPDATE repos SET
-            llm_summary = ?1,
-            llm_what = ?2,
-            llm_why = ?3,
-            llm_use_case = ?4,
-            llm_category = ?5,
-            llm_tags = ?6,
-            llm_generated_at = CURRENT_TIMESTAMP,
-            prompt_version = ?7
-         WHERE id = ?8",
-        params![
-            result.raw_json,
-            result.what,
-            result.why,
-            result.use_case,
-            result.category,
-            tags_json,
-            CURRENT_PROMPT_VERSION,
-            repo_id,
-        ],
-    )?;
+    if locked {
+        tx.execute(
+            "UPDATE repos SET
+                llm_summary = ?1,
+                llm_what = ?2,
+                llm_why = ?3,
+                llm_use_case = ?4,
+                llm_tags = ?5,
+                llm_generated_at = CURRENT_TIMESTAMP,
+                prompt_version = ?6
+             WHERE id = ?7",
+            params![
+                result.raw_json,
+                result.what,
+                result.why,
+                result.use_case,
+                tags_json,
+                CURRENT_PROMPT_VERSION,
+                repo_id,
+            ],
+        )?;
+    } else {
+        tx.execute(
+            "UPDATE repos SET
+                llm_summary = ?1,
+                llm_what = ?2,
+                llm_why = ?3,
+                llm_use_case = ?4,
+                llm_category = ?5,
+                llm_tags = ?6,
+                llm_generated_at = CURRENT_TIMESTAMP,
+                prompt_version = ?7
+             WHERE id = ?8",
+            params![
+                result.raw_json,
+                result.what,
+                result.why,
+                result.use_case,
+                result.category,
+                tags_json,
+                CURRENT_PROMPT_VERSION,
+                repo_id,
+            ],
+        )?;
+    }
     tx.commit()
 }
 
@@ -321,13 +354,15 @@ pub fn repo_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Repo> {
         user_notes: row.get(17)?,
         user_category: row.get(18)?,
         watching: row.get::<_, i64>(19).unwrap_or(0) != 0,
+        category_locked: row.get::<_, i64>(20).unwrap_or(0) != 0,
+        owner_avatar_url: row.get(21).ok(),
     })
 }
 
 pub(crate) const REPO_SELECT: &str =
     "SELECT id, full_name, description, url, language, stars_count, topics, added_at, source,
             llm_summary, llm_what, llm_why, llm_use_case, llm_category, llm_tags, llm_generated_at, prompt_version,
-            user_notes, user_category, watching FROM repos";
+            user_notes, user_category, watching, category_locked, owner_avatar_url FROM repos";
 
 #[tauri::command]
 pub async fn describe_repo(
@@ -574,6 +609,8 @@ mod tests {
             user_notes: None,
             user_category: None,
             watching: false,
+            category_locked: false,
+            owner_avatar_url: None,
         }
     }
 
