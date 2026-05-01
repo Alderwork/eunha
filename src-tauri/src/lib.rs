@@ -70,6 +70,7 @@ pub fn run() {
             commands::onboarding::get_onboarded_at,
             commands::onboarding::set_onboarded_at,
             commands::onboarding::validate_pat,
+            commands::onboarding::save_pat,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
