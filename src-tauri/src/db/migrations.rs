@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result};
 
-const CURRENT_SCHEMA_VERSION: u32 = 4;
+const CURRENT_SCHEMA_VERSION: u32 = 10;
 
 pub fn run(conn: &Connection) -> Result<()> {
     // WAL mode MUST be set before any schema changes — enables concurrent reads+writes
@@ -102,6 +102,113 @@ pub fn run(conn: &Connection) -> Result<()> {
     if version < 4 {
         conn.execute_batch("
             ALTER TABLE repos ADD COLUMN watching INTEGER NOT NULL DEFAULT 0;
+        ")?;
+    }
+
+    if version < 5 {
+        conn.execute_batch("
+            ALTER TABLE repos ADD COLUMN category_locked INTEGER NOT NULL DEFAULT 0;
+            UPDATE repos SET category_locked = 1 WHERE user_category IS NOT NULL;
+        ")?;
+    }
+
+    if version < 6 {
+        conn.execute_batch("
+            CREATE TABLE IF NOT EXISTS releases (
+                id TEXT PRIMARY KEY,
+                repo_id TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+                tag_name TEXT NOT NULL,
+                name TEXT,
+                body TEXT,
+                html_url TEXT NOT NULL,
+                published_at TEXT NOT NULL,
+                is_prerelease INTEGER NOT NULL DEFAULT 0,
+                fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+                read_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_releases_repo ON releases(repo_id);
+            CREATE INDEX IF NOT EXISTS idx_releases_published ON releases(published_at DESC);
+
+            CREATE TABLE IF NOT EXISTS release_assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                release_id TEXT NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                download_url TEXT NOT NULL,
+                size_bytes INTEGER,
+                content_type TEXT,
+                platform TEXT,
+                arch TEXT,
+                file_type TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_assets_release ON release_assets(release_id);
+        ")?;
+    }
+
+    if version < 7 {
+        // Rebuild FTS index to include the `topics` column so curated GitHub tags are searchable.
+        conn.execute_batch("
+            DROP TRIGGER IF EXISTS repos_fts_insert;
+            DROP TRIGGER IF EXISTS repos_fts_update;
+            DROP TRIGGER IF EXISTS repos_fts_delete;
+            DROP TABLE IF EXISTS repos_fts;
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS repos_fts USING fts5(
+                full_name,
+                llm_what,
+                llm_why,
+                llm_use_case,
+                llm_category,
+                llm_tags,
+                topics,
+                user_notes,
+                content='repos',
+                content_rowid='rowid'
+            );
+
+            CREATE TRIGGER IF NOT EXISTS repos_fts_insert AFTER INSERT ON repos BEGIN
+                INSERT INTO repos_fts(rowid, full_name, llm_what, llm_why, llm_use_case, llm_category, llm_tags, topics, user_notes)
+                VALUES (new.rowid, new.full_name, new.llm_what, new.llm_why, new.llm_use_case, new.llm_category, new.llm_tags, new.topics, new.user_notes);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS repos_fts_update AFTER UPDATE ON repos BEGIN
+                INSERT INTO repos_fts(repos_fts, rowid, full_name, llm_what, llm_why, llm_use_case, llm_category, llm_tags, topics, user_notes)
+                VALUES('delete', old.rowid, old.full_name, old.llm_what, old.llm_why, old.llm_use_case, old.llm_category, old.llm_tags, old.topics, old.user_notes);
+                INSERT INTO repos_fts(rowid, full_name, llm_what, llm_why, llm_use_case, llm_category, llm_tags, topics, user_notes)
+                VALUES (new.rowid, new.full_name, new.llm_what, new.llm_why, new.llm_use_case, new.llm_category, new.llm_tags, new.topics, new.user_notes);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS repos_fts_delete AFTER DELETE ON repos BEGIN
+                INSERT INTO repos_fts(repos_fts, rowid, full_name, llm_what, llm_why, llm_use_case, llm_category, llm_tags, topics, user_notes)
+                VALUES('delete', old.rowid, old.full_name, old.llm_what, old.llm_why, old.llm_use_case, old.llm_category, old.llm_tags, old.topics, old.user_notes);
+            END;
+
+            INSERT INTO repos_fts(rowid, full_name, llm_what, llm_why, llm_use_case, llm_category, llm_tags, topics, user_notes)
+            SELECT rowid, full_name, llm_what, llm_why, llm_use_case, llm_category, llm_tags, topics, user_notes FROM repos;
+        ")?;
+    }
+
+    if version < 8 {
+        conn.execute_batch("
+            ALTER TABLE repos ADD COLUMN owner_avatar_url TEXT;
+        ")?;
+    }
+
+    if version < 9 {
+        conn.execute_batch("
+            ALTER TABLE feed_items ADD COLUMN repo_topics TEXT;
+        ")?;
+    }
+
+    if version < 10 {
+        conn.execute_batch("
+            CREATE TABLE IF NOT EXISTS tracked_users (
+                login TEXT PRIMARY KEY,
+                source TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                added_at TEXT NOT NULL DEFAULT (datetime('now')),
+                last_synced_following_at TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_tracked_enabled ON tracked_users(enabled);
         ")?;
     }
 
@@ -260,5 +367,38 @@ mod tests {
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(version, CURRENT_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn migration_v10_creates_tracked_users() {
+        let conn = open_test_db();
+
+        // Insert + read round-trip exercises every column
+        conn.execute(
+            "INSERT INTO tracked_users (login, source) VALUES ('alice', 'following')",
+            [],
+        )
+        .unwrap();
+
+        let (login, source, enabled): (String, String, i64) = conn
+            .query_row(
+                "SELECT login, source, enabled FROM tracked_users WHERE login = 'alice'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(login, "alice");
+        assert_eq!(source, "following");
+        assert_eq!(enabled, 1, "enabled should default to 1");
+
+        // Index must exist
+        let idx_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_tracked_enabled'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(idx_count, 1, "idx_tracked_enabled should exist");
     }
 }
