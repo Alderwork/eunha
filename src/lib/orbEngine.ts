@@ -89,17 +89,104 @@ export class OrbEngine {
     this.rafId = requestAnimationFrame(this.loop);
   };
 
-  private tickScene(_now: number): void {
-    // Filled in Task 6.
-    void this.current; void this.target; void this.transitionStart; void this.transitionMs;
+  private tickScene(now: number): void {
+    if (this.transitionMs <= 0) {
+      this.current = { ...this.target };
+      return;
+    }
+    const elapsed = now - this.transitionStart;
+    const t = Math.min(1, elapsed / this.transitionMs);
+    // ease-in-out cubic
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const lerp = (a: number, b: number) => a + (b - a) * eased;
+
+    this.current = {
+      spawnRate:          lerp(this.current.spawnRate,          this.target.spawnRate),
+      gravityToCenter:    lerp(this.current.gravityToCenter,    this.target.gravityToCenter),
+      drag:               lerp(this.current.drag,               this.target.drag),
+      trailLength:        lerp(this.current.trailLength,        this.target.trailLength),
+      ambientCount:       lerp(this.current.ambientCount,       this.target.ambientCount),
+      orbGlowMultiplier:  lerp(this.current.orbGlowMultiplier,  this.target.orbGlowMultiplier),
+    };
+    if (t >= 1) this.transitionMs = 0;
   }
-  private tickSpawn(_dt: number): void {
-    // Filled in Task 6.
-    void this.spawnAccumulator;
+
+  private tickSpawn(dt: number): void {
+    if (!this.canvas) return;
+    this.spawnAccumulator += this.current.spawnRate * dt;
+    const w = this.canvas.width / this.dpr;
+    const h = this.canvas.height / this.dpr;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    while (this.spawnAccumulator >= 1 && (this.spawnQueue > 0 || this.current.ambientCount > this.particles.length)) {
+      this.spawnAccumulator -= 1;
+
+      // Pick a random edge spawn point.
+      const edge = Math.floor(Math.random() * 4); // 0=top 1=right 2=bottom 3=left
+      let sx = 0, sy = 0;
+      if (edge === 0) { sx = Math.random() * w; sy = -8; }
+      else if (edge === 1) { sx = w + 8; sy = Math.random() * h; }
+      else if (edge === 2) { sx = Math.random() * w; sy = h + 8; }
+      else { sx = -8; sy = Math.random() * h; }
+
+      // Initial velocity gently toward center (refined by gravity each frame).
+      const dx = cx - sx;
+      const dy = cy - sy;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const speed = 30 + Math.random() * 30;
+
+      this.particles.push({
+        x: sx,
+        y: sy,
+        vx: (dx / dist) * speed,
+        vy: (dy / dist) * speed,
+        life: 1,
+        maxLife: 2 + Math.random() * 1.5,
+      });
+
+      if (this.spawnQueue > 0) this.spawnQueue -= 1;
+    }
   }
-  private tickParticles(_dt: number): void {
-    // Filled in Task 6.
-    void this.particles;
+
+  private tickParticles(dt: number): void {
+    if (!this.canvas) return;
+    const w = this.canvas.width / this.dpr;
+    const h = this.canvas.height / this.dpr;
+    const cx = w / 2;
+    const cy = h / 2;
+    const absorbRadius = 18; // particles within this distance of orb center disappear
+    const dragPerFrame = Math.pow(this.current.drag, dt);
+
+    const next: Particle[] = [];
+    for (const p of this.particles) {
+      const dx = cx - p.x;
+      const dy = cy - p.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      if (dist < absorbRadius) continue; // absorbed
+
+      // Apply gravity (negative = orbital tangent)
+      if (this.current.gravityToCenter >= 0) {
+        const a = this.current.gravityToCenter * dt;
+        p.vx += (dx / dist) * a;
+        p.vy += (dy / dist) * a;
+      } else {
+        // Tangential: 90° rotation of (dx, dy)
+        const a = -this.current.gravityToCenter * dt;
+        p.vx += (-dy / dist) * a;
+        p.vy += (dx / dist) * a;
+      }
+
+      p.vx *= dragPerFrame;
+      p.vy *= dragPerFrame;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life -= dt / p.maxLife;
+
+      if (p.life <= 0) continue;
+      next.push(p);
+    }
+    this.particles = next;
   }
   private render(): void {
     // Filled in Task 7.
