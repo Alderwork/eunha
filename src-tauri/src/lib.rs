@@ -1,4 +1,5 @@
 mod commands;
+mod config;
 mod db;
 mod models;
 
@@ -20,6 +21,14 @@ pub fn run() {
             app.manage(DbState(Mutex::new(conn)));
             app.manage(CancelState(Arc::new(AtomicBool::new(false))));
             app.manage(FeedCancelState(Arc::new(AtomicBool::new(false))));
+
+            // Set app icon at runtime so it shows in Cmd+Tab / Mission Control
+            // even when running via `tauri dev` (no .app bundle present).
+            #[cfg(target_os = "macos")]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_icon(tauri::include_image!("icons/icon-transparent.png"));
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -40,9 +49,24 @@ pub fn run() {
             commands::feed::dismiss_feed_item,
             commands::feed::add_feed_repo_to_library,
             commands::feed::update_last_visited_at,
+            commands::feed::get_feed_unread_count,
             commands::library::toggle_watching,
             commands::library::list_watching,
             commands::watching::get_latest_release,
+            commands::feed::get_my_github_login,
+            commands::feed::get_avatar_urls,
+            commands::readme::fetch_readme,
+            commands::trending::fetch_trending,
+            commands::library::set_category_lock,
+            commands::avatars::backfill_owner_avatars,
+            commands::backup::export_database,
+            commands::backup::import_database,
+            commands::releases::sync_releases,
+            commands::releases::list_releases,
+            commands::releases::mark_release_read,
+            commands::releases::mark_all_releases_read,
+            commands::releases::get_unread_release_count,
+            commands::releases::list_watched_repos_with_unread,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

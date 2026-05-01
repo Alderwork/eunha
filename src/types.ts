@@ -19,6 +19,8 @@ export interface Repo {
   user_notes: string | null;
   user_category: string | null;
   watching: boolean;
+  category_locked: boolean;
+  owner_avatar_url: string | null;
 }
 
 export interface CategoryCount {
@@ -57,6 +59,11 @@ export interface BatchDescribeProgress {
   failed: number;
 }
 
+export interface WatchedRepoEntry {
+  repo: Repo;
+  unread: number;
+}
+
 export interface LatestRelease {
   tag_name: string;
   published_at: string;
@@ -65,14 +72,25 @@ export interface LatestRelease {
 
 export type Provider = 'openai' | 'anthropic' | 'ollama';
 
+export interface TrendingRepo {
+  full_name: string;
+  description: string | null;
+  language: string | null;
+  stars_today: number | null;
+  total_stars: number | null;
+  url: string;
+}
+
 export interface FeedGroup {
   repo_full_name: string;
   repo_description: string | null;
   repo_url: string;
   repo_language: string | null;
   repo_stars_count: number | null;
+  repo_topics: string | null;
   starred_by: string[];
   latest_starred_at: string;
+  in_library: boolean;
 }
 
 export interface FeedFetchProgress {

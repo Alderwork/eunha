@@ -22,6 +22,14 @@ pub struct Repo {
     pub user_notes: Option<String>,
     pub user_category: Option<String>,
     pub watching: bool,
+    pub category_locked: bool,
+    pub owner_avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchedRepoEntry {
+    pub repo: Repo,
+    pub unread: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +60,7 @@ pub struct AppConstants {
     pub current_prompt_version: u32,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportProgress {
     pub page: u32,
@@ -68,6 +77,7 @@ pub struct ImportResult {
     pub error: Option<String>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DescribeProgress {
     pub current: u32,
@@ -90,10 +100,13 @@ pub struct FeedGroup {
     pub repo_url: String,
     pub repo_language: Option<String>,
     pub repo_stars_count: Option<i64>,
+    pub repo_topics: Option<String>,
     pub starred_by: Vec<String>,
     pub latest_starred_at: String,
+    pub in_library: bool,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedFetchProgress {
     pub phase: String,

@@ -1,61 +1,8 @@
 use crate::db::{migrations, DbState};
 use tauri::{AppHandle, State};
 
-// Legacy keychain keys from a previous version of the app that used tauri-plugin-keychain
-// (which stored under the bundle identifier as the service name).
-const LEGACY_SERVICE: &str = "com.neungsohwa.eunha";
-
-fn kr(key: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new("eunha", key).map_err(|e| e.to_string())
-}
-
 pub(crate) fn get_secret(key: &str) -> Option<String> {
-    // Try current location first.
-    let current = keyring::Entry::new("eunha", key)
-        .ok()
-        .and_then(|e| e.get_password().ok())
-        .filter(|s| !s.is_empty());
-
-    if current.is_some() {
-        return current;
-    }
-
-    // Fall back to legacy keychain entries (pre-migration).
-    let legacy_account = match key {
-        "github_pat" => "github_token",
-        "llm_api_key" => "ai_key_google",
-        _ => return None,
-    };
-    keyring::Entry::new(LEGACY_SERVICE, legacy_account)
-        .ok()
-        .and_then(|e| e.get_password().ok())
-        .filter(|s| !s.is_empty())
-}
-
-/// If the current keychain slot is empty but the legacy slot has a value, copy it over.
-/// Best-effort — silently ignores all errors so it never blocks a save.
-fn migrate_legacy_secret(current_key: &str, legacy_account: &str) {
-    let already_set = keyring::Entry::new("eunha", current_key)
-        .ok()
-        .and_then(|e| e.get_password().ok())
-        .map(|s| !s.is_empty())
-        .unwrap_or(false);
-
-    if already_set {
-        return;
-    }
-
-    if let Some(legacy_val) = keyring::Entry::new(LEGACY_SERVICE, legacy_account)
-        .ok()
-        .and_then(|e| e.get_password().ok())
-        .filter(|s| !s.is_empty())
-    {
-        let _ = set_secret(current_key, &legacy_val);
-    }
-}
-
-fn set_secret(key: &str, value: &str) -> Result<(), String> {
-    kr(key)?.set_password(value).map_err(|e| e.to_string())
+    crate::config::get_secret(key)
 }
 
 fn mask_secret(s: &str) -> String {
@@ -81,27 +28,19 @@ pub fn save_settings(
     state: State<'_, DbState>,
     _app: AppHandle,
 ) -> Result<serde_json::Value, String> {
-    let mut keychain_error: Option<String> = None;
+    let mut config_error: Option<String> = None;
 
-    // Secrets go to keychain — failures are surfaced as a warning (not a hard error)
-    // so SQLite settings always save even if keychain is unavailable.
     if let Some(pat) = github_pat {
-        if let Err(e) = set_secret("github_pat", &pat) {
-            keychain_error = Some(format!("Keychain error (PAT): {e}"));
+        if let Err(e) = crate::config::set_secret("github_pat", &pat) {
+            config_error = Some(format!("Config error (PAT): {e}"));
         }
-    } else {
-        // No new PAT supplied — migrate legacy entry to current location if needed.
-        migrate_legacy_secret("github_pat", "github_token");
     }
     if let Some(key) = llm_api_key {
-        if let Err(e) = set_secret("llm_api_key", &key) {
-            keychain_error = Some(format!("Keychain error (API key): {e}"));
+        if let Err(e) = crate::config::set_secret("llm_api_key", &key) {
+            config_error = Some(format!("Config error (API key): {e}"));
         }
-    } else {
-        migrate_legacy_secret("llm_api_key", "ai_key_google");
     }
 
-    // Non-secret settings go to SQLite
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     if let Some(provider) = llm_provider {
         migrations::settings_set(&conn, "llm_provider", &provider)
@@ -120,7 +59,7 @@ pub fn save_settings(
             .map_err(|e| e.to_string())?;
     }
 
-    Ok(serde_json::json!({ "keychain_error": keychain_error }))
+    Ok(serde_json::json!({ "keychain_error": config_error }))
 }
 
 #[tauri::command]

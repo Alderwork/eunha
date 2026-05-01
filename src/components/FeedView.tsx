@@ -5,6 +5,10 @@ import { listen } from '@tauri-apps/api/event';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { FeedGroup, FeedFetchProgress, FeedFetchResult, Repo } from '../types';
 import { useKeydown } from '../hooks/useKeydown';
+import { Kbd } from './ui/Kbd';
+import { RepoRow } from './RepoRow';
+import { feedGroupToRepo } from '../lib/adapters';
+import { getRowHeight } from '../lib/visuals';
 
 interface Props {
   onBack: () => void;
@@ -28,21 +32,26 @@ function relativeTime(isoString: string): string {
 
 export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Props) {
   const [groups, setGroups] = useState<FeedGroup[]>([]);
+  const gPressedRef = useRef(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [fetching, setFetching] = useState(false);
   const [fetchProgress, setFetchProgress] = useState<FeedFetchProgress | null>(null);
   const [lastFetchResult, setLastFetchResult] = useState<FeedFetchResult | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  // True once groups has been non-empty this session — distinguishes "inbox cleared" from "nothing found"
   const [hadItems, setHadItems] = useState(false);
-  // Track which repos are being added (repo_full_name -> true)
   const [adding, setAdding] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
+
+  const groupsRef = useRef(groups);
+  groupsRef.current = groups;
+  const selectedIdxRef = useRef(selectedIdx);
+  selectedIdxRef.current = selectedIdx;
 
   const rowVirtualizer = useVirtualizer({
     count: groups.length,
     getScrollElement: () => listRef.current,
-    estimateSize: () => 72,
+    estimateSize: (i) => getRowHeight(feedGroupToRepo(groupsRef.current[i]), i === selectedIdxRef.current),
+    getItemKey: (i) => groupsRef.current[i]?.repo_full_name ?? i,
     overscan: 8,
   });
 
@@ -88,11 +97,6 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
     }
   }
 
-  // Load items on mount; auto-fetch if empty
-  // NOTE: do NOT call update_last_visited_at here — fetch_feed updates the cutoff
-  // at the end of a successful fetch. Calling it on mount before the fetch would set
-  // the cutoff to NOW and make the initial auto-fetch find nothing (first-time users
-  // would see an empty feed instead of the last 7 days of activity).
   useEffect(() => {
     loadItems().then((items) => {
       if (items.length === 0) runFetch();
@@ -106,8 +110,8 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
     return () => { unlisten?.(); };
   }, []);
 
-  // Scroll selected row into view
   useEffect(() => {
+    rowVirtualizer.measure();
     if (groups.length > 0) {
       rowVirtualizer.scrollToIndex(selectedIdx, { align: 'auto' });
     }
@@ -121,7 +125,6 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
         repoFullName: group.repo_full_name,
       });
       onRepoAdded(repo);
-      // Auto-dismiss: remove from feed after adding (inbox model — it's been processed)
       setGroups((gs) => gs.filter((g) => g.repo_full_name !== group.repo_full_name));
       setSelectedIdx((i) => Math.max(0, Math.min(i, groups.length - 2)));
       showToast(`Added ${group.repo_full_name} to library`);
@@ -144,11 +147,9 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
         repoFullName: group.repo_full_name,
       });
       onRepoAdded(repo);
-      // Auto-dismiss after adding
       setGroups((gs) => gs.filter((g) => g.repo_full_name !== group.repo_full_name));
       setSelectedIdx((i) => Math.max(0, Math.min(i, groups.length - 2)));
       showToast(`Added — describing in library…`);
-      // Trigger LLM describe via parent callback (switches view to library)
       onDescribeRepo(repo);
     } catch (e) {
       showToast(`Failed: ${e}`, 'error');
@@ -190,11 +191,34 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
             e.preventDefault();
             setSelectedIdx((i) => Math.max(i - 1, 0));
             break;
+          case 'd':
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setSelectedIdx((i) => Math.min(i + 10, groups.length - 1));
+              break;
+            }
+            if (group && !adding.has(group.repo_full_name)) handleAddAndDescribe(group);
+            break;
+          case 'u':
+            if (e.ctrlKey) {
+              e.preventDefault();
+              setSelectedIdx((i) => Math.max(i - 10, 0));
+            }
+            break;
+          case 'g':
+            if (gPressedRef.current) {
+              setSelectedIdx(0);
+              gPressedRef.current = false;
+            } else {
+              gPressedRef.current = true;
+              setTimeout(() => { gPressedRef.current = false; }, 500);
+            }
+            break;
+          case 'G':
+            setSelectedIdx(Math.max(0, groups.length - 1));
+            break;
           case 'a':
             if (group && !adding.has(group.repo_full_name)) handleAdd(group);
-            break;
-          case 'd':
-            if (group && !adding.has(group.repo_full_name)) handleAddAndDescribe(group);
             break;
           case 'x':
             if (group) handleDismiss(group);
@@ -220,23 +244,16 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Feed header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2 border-b border-[var(--border)]">
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2 border-b border-border">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
-            title="Back to library (Esc)"
-          >
-            ← Library
-          </button>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-[var(--text)]">Network Stars</span>
-              <span className="text-[10px] font-mono text-[var(--amber)] border border-[var(--amber)] border-opacity-40 px-1 py-0.5 rounded leading-none opacity-70">
+              <span className="text-sm font-semibold text-ink">Network Stars</span>
+              <span className="text-[10px] font-mono text-accent border border-accent/40 px-1 py-0.5 rounded-[2px] leading-none">
                 FEED
               </span>
             </div>
-            <p className="text-xs text-[var(--muted)] leading-none mt-0.5">
+            <p className="text-xs text-muted leading-none mt-0.5">
               repos your network starred recently
             </p>
           </div>
@@ -248,7 +265,7 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
                 invoke('cancel_feed_fetch');
                 setFetching(false);
               }}
-              className="text-xs text-[var(--muted)] hover:text-[var(--text)] px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--muted)] transition-colors"
+              className="text-xs text-muted hover:text-ink px-2 py-1 rounded border border-border hover:border-dim transition-colors"
               title="Cancel fetch"
             >
               Cancel
@@ -257,7 +274,7 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
           <button
             onClick={runFetch}
             disabled={fetching}
-            className="text-xs text-[var(--muted)] hover:text-[var(--text)] px-2 py-1 rounded border border-[var(--border)] hover:border-[var(--muted)] transition-colors disabled:opacity-40"
+            className="text-xs text-muted hover:text-ink px-2 py-1 rounded border border-border hover:border-dim transition-colors disabled:opacity-40"
             title="Refresh feed (r)"
           >
             {fetching ? 'Fetching…' : 'Refresh'}
@@ -267,8 +284,8 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
 
       {/* Fetch progress bar */}
       {fetching && fetchProgress && (
-        <div className="flex-shrink-0 px-5 py-2 border-b border-[var(--border)] bg-[var(--surface)]">
-          <div aria-live="polite" className="flex items-center justify-between text-xs text-[var(--muted)] mb-1">
+        <div className="flex-shrink-0 px-5 py-2 border-b border-border bg-surface">
+          <div aria-live="polite" className="flex items-center justify-between text-xs text-muted mb-1">
             <span>
               {fetchProgress.phase === 'following'
                 ? 'Fetching people you follow…'
@@ -288,10 +305,10 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
               aria-valuenow={fetchProgress.users_done}
               aria-valuemax={fetchProgress.users_total}
               aria-label="Feed fetch progress"
-              className="h-0.5 bg-[var(--border)] rounded-full overflow-hidden"
+              className="h-0.5 bg-elevated rounded-full overflow-hidden"
             >
               <div
-                className="h-full bg-[var(--amber)] transition-all duration-300"
+                className="h-full bg-brand transition-all duration-300"
                 style={{
                   width: `${(fetchProgress.users_done / fetchProgress.users_total) * 100}%`,
                 }}
@@ -306,43 +323,39 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
         {groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2">
             {fetching ? (
-              <span className="text-sm text-[var(--muted)]">Fetching your network&apos;s activity…</span>
+              <span className="text-sm text-muted">Fetching your network&apos;s activity…</span>
             ) : fetchError ? (
               <>
-                <span className="text-sm font-serif text-[var(--muted)]">Could not reach GitHub.</span>
-                <span className="text-xs text-[var(--muted)] opacity-60 text-center max-w-xs">
+                <span className="text-sm text-muted">Could not reach GitHub.</span>
+                <span className="text-xs text-muted opacity-60 text-center max-w-xs">
                   {fetchError}
                 </span>
-                <span className="text-xs text-[var(--muted)] opacity-60">
+                <span className="text-xs text-muted opacity-60 flex items-center gap-1">
                   Check your connection, then press{' '}
-                  <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded font-mono">r</kbd>
+                  <Kbd>r</Kbd>
                   {' '}to retry.
                 </span>
               </>
             ) : hadItems ? (
               <>
-                <span className="text-sm font-serif text-[var(--muted)]">Inbox cleared.</span>
-                <span className="text-xs text-[var(--muted)] opacity-60">
-                  Press{' '}
-                  <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded font-mono">r</kbd>
-                  {' '}to check for more.
+                <span className="text-sm text-muted">Inbox cleared.</span>
+                <span className="text-xs text-muted opacity-60 flex items-center gap-1">
+                  Press{' '}<Kbd>r</Kbd>{' '}to check for more.
                 </span>
               </>
             ) : lastFetchResult ? (
               <>
-                <span className="text-sm font-serif text-[var(--muted)]">
+                <span className="text-sm text-muted">
                   {lastFetchResult.users_total === 0
                     ? "You don't follow anyone on GitHub yet."
                     : `No new repos since last visit — checked ${lastFetchResult.users_total} users`}
                 </span>
-                <span className="text-xs text-[var(--muted)] opacity-60">
-                  Press{' '}
-                  <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded font-mono">r</kbd>
-                  {' '}to refresh
+                <span className="text-xs text-muted opacity-60 flex items-center gap-1">
+                  Press{' '}<Kbd>r</Kbd>{' '}to refresh
                 </span>
               </>
             ) : (
-              <span className="text-sm font-serif text-[var(--muted)]">No new repos from your network.</span>
+              <span className="text-sm text-muted">No new repos from your network.</span>
             )}
           </div>
         ) : (
@@ -351,6 +364,18 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
               const group = groups[vItem.index];
               const isSelected = vItem.index === selectedIdx;
               const isAdding = adding.has(group.repo_full_name);
+              const repo = feedGroupToRepo(group);
+
+              const rightExtra = (
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  {isAdding && <span className="text-xs text-accent">adding…</span>}
+                  <span className="text-xs text-faint">{relativeTime(group.latest_starred_at)}</span>
+                  <span className="text-xs text-muted truncate max-w-[120px]">
+                    {group.starred_by.slice(0, 2).join(', ')}
+                    {group.starred_by.length > 2 && ` +${group.starred_by.length - 2}`}
+                  </span>
+                </div>
+              );
 
               return (
                 <div
@@ -362,57 +387,16 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
                     left: 0,
                     right: 0,
                     transform: `translateY(${vItem.start}px)`,
+                    opacity: isAdding ? 0.6 : 1,
                   }}
-                  onClick={() => setSelectedIdx(vItem.index)}
                 >
-                  <div
-                    className={`flex items-start px-5 py-3 border-b border-[var(--border)] cursor-pointer transition-colors ${
-                      isSelected ? 'bg-[var(--surface)]' : 'hover:bg-[var(--surface)]'
-                    } ${isAdding ? 'opacity-60' : ''}`}
-                  >
-                    {/* Selection indicator */}
-                    <div
-                      className={`flex-shrink-0 w-0.5 self-stretch mr-3 rounded-full transition-colors ${
-                        isSelected ? 'bg-[var(--amber)]' : 'bg-transparent'
-                      }`}
-                    />
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-sm truncate text-[var(--amber)]">
-                          {group.repo_full_name}
-                        </span>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          {isAdding && (
-                            <span className="text-xs text-[var(--amber)]">adding…</span>
-                          )}
-                          {group.repo_language && (
-                            <span className="text-xs text-[var(--muted)]">
-                              {group.repo_language}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {group.repo_description && (
-                        <p className="text-xs text-[var(--text)] mt-0.5 truncate">
-                          {group.repo_description}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-1 mt-1">
-                        <span className="text-xs text-[var(--muted)]">★ by</span>
-                        <span className="text-xs text-[var(--muted)]">
-                          {group.starred_by.slice(0, 3).join(', ')}
-                          {group.starred_by.length > 3 && ` +${group.starred_by.length - 3}`}
-                        </span>
-                        <span className="text-xs text-[var(--muted)]">·</span>
-                        <span className="text-xs text-[var(--muted)]">
-                          {relativeTime(group.latest_starred_at)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                  <RepoRow
+                    repo={repo}
+                    isSelected={isSelected}
+                    currentPromptVersion={0}
+                    onClick={() => setSelectedIdx(vItem.index)}
+                    rightExtra={rightExtra}
+                  />
                 </div>
               );
             })}
@@ -420,76 +404,22 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
         )}
       </div>
 
-      {/* Detail panel for selected group */}
+      {/* Action hint bar */}
       {selectedGroup && (
-        <div
-          aria-label={`Selected: ${selectedGroup.repo_full_name}`}
-          className="flex-shrink-0 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-4 max-h-48 overflow-y-auto"
-        >
-          <div className="flex items-start justify-between gap-4 mb-2">
-            <span className="font-mono text-sm text-[var(--amber)]">
-              {selectedGroup.repo_full_name}
-            </span>
-            <div className="flex items-center gap-3 flex-shrink-0 text-xs text-[var(--muted)]">
-              {selectedGroup.repo_language && <span>{selectedGroup.repo_language}</span>}
-              {selectedGroup.repo_stars_count != null && (
-                <span>★ {selectedGroup.repo_stars_count.toLocaleString()}</span>
-              )}
-            </div>
-          </div>
-
-          {selectedGroup.repo_description && (
-            <p className="text-sm text-[var(--text)] mb-2">{selectedGroup.repo_description}</p>
-          )}
-
-          {/* Stargazers — cap at 10 to keep action hints visible */}
-          <div className="flex flex-wrap gap-1 mb-3">
-            {selectedGroup.starred_by.slice(0, 10).map((user) => (
-              <span
-                key={user}
-                className="text-xs text-[var(--muted)] border border-[var(--border)] px-1.5 py-0.5 rounded"
-              >
-                {user}
-              </span>
-            ))}
-            {selectedGroup.starred_by.length > 10 && (
-              <span className="text-xs text-[var(--muted)] border border-[var(--border)] px-1.5 py-0.5 rounded">
-                +{selectedGroup.starred_by.length - 10} more
-              </span>
-            )}
-          </div>
-
-          {/* Action hints — separated from info above */}
-          <div className={`border-t border-[var(--border)] pt-2 flex gap-4 text-xs text-[var(--muted)] ${
-            adding.has(selectedGroup.repo_full_name) ? 'opacity-40' : ''
-          }`}>
-            <span>
-              <kbd className="px-1 bg-[var(--bg)] border border-[var(--border)] rounded font-mono">a</kbd>
-              {' '}add to library
-            </span>
-            <span>
-              <kbd className="px-1 bg-[var(--bg)] border border-[var(--border)] rounded font-mono">d</kbd>
-              {' '}add + describe
-            </span>
-            <span>
-              <kbd className="px-1 bg-[var(--bg)] border border-[var(--border)] rounded font-mono">o</kbd>
-              {' '}open
-            </span>
-            <span>
-              <kbd className="px-1 bg-[var(--bg)] border border-[var(--border)] rounded font-mono">x</kbd>
-              {' '}dismiss
-            </span>
-          </div>
+        <div className={`flex-shrink-0 border-t border-border px-5 py-2 flex gap-4 text-xs text-muted ${
+          adding.has(selectedGroup.repo_full_name) ? 'opacity-40' : ''
+        }`}>
+          <span className="flex items-center gap-1"><Kbd>a</Kbd>{' '}add</span>
+          <span className="flex items-center gap-1"><Kbd>d</Kbd>{' '}add + describe</span>
+          <span className="flex items-center gap-1"><Kbd>o</Kbd>{' '}open</span>
+          <span className="flex items-center gap-1"><Kbd>x</Kbd>{' '}dismiss</span>
         </div>
       )}
 
       {/* Status bar */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-1.5 border-t border-[var(--border)] text-xs text-[var(--muted)]">
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-1.5 border-t border-border text-xs text-muted">
         <span>{groups.length} items in feed</span>
-        <span>
-          <kbd className="px-1 bg-[var(--surface)] border border-[var(--border)] rounded">Esc</kbd>
-          {' '}back to library
-        </span>
+        <span className="flex items-center gap-1"><Kbd>h</Kbd>{' '}library</span>
       </div>
     </div>
   );

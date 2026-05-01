@@ -7,9 +7,9 @@ export function ToastBanner({ message, type = 'info' }: Props) {
   if (!message) return null;
 
   const colors = {
-    info: 'bg-[#1a1a20] border-[var(--border)] text-[var(--muted)]',
-    error: 'bg-red-950/30 border-red-900 text-red-400',
-    warn: 'bg-[#2a2010] border-[#5a4020] text-[#a06830]',
+    info:  'bg-panel border-border text-muted',
+    error: 'bg-danger-tint border-danger/30 text-danger',
+    warn:  'bg-warn-tint border-warn/30 text-warn',
   };
 
   return (

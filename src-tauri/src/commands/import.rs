@@ -6,6 +6,11 @@ use std::sync::Arc;
 use tauri::{Emitter, State};
 
 #[derive(Debug, serde::Deserialize)]
+struct GithubOwner {
+    avatar_url: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
 struct GithubRepo {
     full_name: String,
     html_url: String,
@@ -13,6 +18,7 @@ struct GithubRepo {
     language: Option<String>,
     stargazers_count: Option<i64>,
     topics: Option<Vec<String>>,
+    owner: Option<GithubOwner>,
 }
 
 async fn fetch_page(
@@ -95,9 +101,10 @@ fn save_page(conn: &rusqlite::Connection, repos: &[GithubRepo]) -> rusqlite::Res
             .map(|t| serde_json::to_string(t).unwrap_or_default())
             .unwrap_or_default();
 
+        let owner_avatar_url = repo.owner.as_ref().and_then(|o| o.avatar_url.clone());
         let affected = tx.execute(
-            "INSERT OR IGNORE INTO repos (id, full_name, description, url, language, stars_count, topics, source)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'starred')",
+            "INSERT OR IGNORE INTO repos (id, full_name, description, url, language, stars_count, topics, source, owner_avatar_url)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'starred', ?8)",
             params![
                 repo.full_name,
                 repo.full_name,
@@ -106,6 +113,7 @@ fn save_page(conn: &rusqlite::Connection, repos: &[GithubRepo]) -> rusqlite::Res
                 repo.language,
                 repo.stargazers_count,
                 topics_json,
+                owner_avatar_url,
             ],
         )?;
 
@@ -124,11 +132,7 @@ pub async fn import_stars(
     app: tauri::AppHandle,
     cancel: State<'_, CancelState>,
 ) -> Result<ImportResult, String> {
-    let pat = keyring::Entry::new("eunha", "github_pat")
-        .ok()
-        .and_then(|e| e.get_password().ok())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_default();
+    let pat = crate::config::get_secret("github_pat").unwrap_or_default();
 
     if pat.is_empty() {
         return Err("GitHub PAT not set. Open Settings (,) to add your token.".to_string());

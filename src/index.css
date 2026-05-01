@@ -1,13 +1,97 @@
-@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap');
+@import url('https://rsms.me/inter/inter.css');
 @import "tailwindcss";
 
-:root {
-  --amber: #E8974A;
-  --bg: #0C0C0E;
-  --surface: #141416;
-  --border: #222226;
-  --text: #E8E8E4;
-  --muted: #6B6B70;
+@theme {
+  /* Font */
+  --font-family-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Font weights — Linear signature scale */
+  --font-weight-light: 300;
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
+  --font-weight-bold: 590;
+
+  /* Backgrounds — luminance stack (deeper = darker) */
+  --color-bg-deep: #010102;
+  --color-bg:      #08090a;
+  --color-panel:   #0f1011;
+  --color-surface: #191a1b;
+  --color-elevated:#28282c;
+  --color-input:   rgba(255,255,255,0.02);
+
+  /* Text — 4-tier gray */
+  --color-ink:     #f7f8f8;
+  --color-dim:     #d0d6e0;
+  --color-muted:   #8a8f98;
+  --color-faint:   #62666d;
+
+  /* Brand + accent (only chromatic family) */
+  --color-brand:       #5e6ad2;
+  --color-brand-hover: #828fff;
+  --color-brand-tint:  rgba(94,106,210,0.15);
+  --color-accent:      #7170ff;
+  --color-on-brand:    #ffffff;
+
+  /* Borders — semi-transparent white by default */
+  --color-border:        rgba(255,255,255,0.08);
+  --color-border-subtle: rgba(255,255,255,0.05);
+  --color-line:          #23252a;
+
+  /* Status */
+  --color-success:      #10b981;
+  --color-success-tint: rgba(16,185,129,0.12);
+  --color-danger:       #f87171;
+  --color-danger-tint:  rgba(239,68,68,0.12);
+  --color-warn:         #f59e0b;
+  --color-warn-tint:    rgba(245,158,11,0.12);
+
+  /* Overlay */
+  --color-overlay: rgba(0,0,0,0.85);
+
+  /* Radii */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius:    6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Shadows */
+  --shadow-dialog: 0px 0px 0px 1px rgba(0,0,0,0.08), 0px 1px 1px 0px rgba(0,0,0,0.07), 0px 3px 2px 0px rgba(0,0,0,0.04), 0px 5px 2px 0px rgba(0,0,0,0.01);
+  --shadow-elevated: 0px 2px 4px 0px rgba(0,0,0,0.40);
+}
+
+/* Light theme */
+html.light {
+  --color-bg-deep: #f0f1f2;
+  --color-bg:      #f7f8f8;
+  --color-panel:   #ffffff;
+  --color-surface: #f5f6f7;
+  --color-elevated:#ecedef;
+  --color-input:   rgba(0,0,0,0.02);
+
+  --color-ink:   #0f1011;
+  --color-dim:   #3a3b3e;
+  --color-muted: #62666d;
+  --color-faint: #8a8f98;
+
+  --color-brand:      #5e6ad2;
+  --color-brand-hover:#828fff;
+  --color-brand-tint: rgba(94,106,210,0.10);
+  --color-accent:     #7170ff;
+  --color-on-brand:   #ffffff;
+
+  --color-border:        rgba(0,0,0,0.10);
+  --color-border-subtle: rgba(0,0,0,0.06);
+  --color-line:          #d0d6e0;
+
+  --color-success:      #0d9166;
+  --color-success-tint: rgba(13,145,102,0.10);
+  --color-danger:       #dc2626;
+  --color-danger-tint:  rgba(220,38,38,0.10);
+  --color-warn:         #d97706;
+  --color-warn-tint:    rgba(217,119,6,0.10);
+
+  --color-overlay: rgba(0,0,0,0.60);
 }
 
 * {
@@ -15,16 +99,20 @@
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Source Serif 4', Georgia, serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-feature-settings: 'cv01', 'ss03';
+  font-weight: 400;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
 
-input, textarea {
+input, textarea, select {
+  font-family: inherit;
+  font-feature-settings: inherit;
   user-select: text;
 }
 
@@ -36,9 +124,9 @@ input, textarea {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--color-line);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: var(--color-muted);
 }

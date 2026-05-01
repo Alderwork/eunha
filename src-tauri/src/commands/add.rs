@@ -1,4 +1,4 @@
-use crate::commands::describe::repo_from_row;
+use crate::commands::describe::{repo_from_row, REPO_SELECT};
 use crate::db::DbState;
 use crate::models::Repo;
 use rusqlite::params;
@@ -37,11 +37,6 @@ fn parse_repo_input(input: &str) -> Result<String, String> {
     Err("Enter owner/repo or a GitHub URL".to_string())
 }
 
-const REPO_SELECT: &str =
-    "SELECT id, full_name, description, url, language, stars_count, topics, added_at, source,
-            llm_summary, llm_what, llm_why, llm_use_case, llm_category, llm_tags, llm_generated_at, prompt_version,
-            user_notes, user_category FROM repos";
-
 #[tauri::command]
 pub async fn add_repo(
     input: String,
@@ -66,11 +61,7 @@ pub async fn add_repo(
         }
     }
 
-    let pat = keyring::Entry::new("eunha", "github_pat")
-        .ok()
-        .and_then(|e| e.get_password().ok())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_default();
+    let pat = crate::config::get_secret("github_pat").unwrap_or_default();
 
     let client = reqwest::Client::new();
     let api_url = format!("https://api.github.com/repos/{}", full_name);
@@ -116,13 +107,14 @@ pub async fn add_repo(
         })
         .unwrap_or_default();
     let topics_json = serde_json::to_string(&topics).unwrap_or_default();
+    let owner_avatar_url = data["owner"]["avatar_url"].as_str().map(|s| s.to_string());
 
     {
         let conn = state.0.lock().map_err(|e| e.to_string())?;
         conn.execute(
-            "INSERT INTO repos (id, full_name, description, url, language, stars_count, topics, source)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'manual')",
-            params![repo_id, full_name, description, url, language, stars_count, topics_json],
+            "INSERT INTO repos (id, full_name, description, url, language, stars_count, topics, source, owner_avatar_url)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'manual', ?8)",
+            params![repo_id, full_name, description, url, language, stars_count, topics_json, owner_avatar_url],
         )
         .map_err(|e| format!("DB insert failed: {e}"))?;
     }

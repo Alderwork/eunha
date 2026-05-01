@@ -1,7 +1,12 @@
 pub mod add;
+pub mod avatars;
+pub mod backup;
 pub mod describe;
 pub mod feed;
 pub mod import;
 pub mod library;
+pub mod readme;
+pub mod releases;
 pub mod settings;
+pub mod trending;
 pub mod watching;

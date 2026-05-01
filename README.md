@@ -2,6 +2,8 @@
 
 # eunha
 
+**eunha** (은하) means *galaxy* in Korean — a collection of stars, yours to explore.
+
 A local-first, keyboard-first desktop app for building a personal GitHub repo library. Import your starred repos, describe them with an LLM, and navigate your collection without a mouse.
 
 > your stars. your eunha.

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { ImportResult, ImportProgress } from '../types';
+import { Modal } from './ui/Modal';
+import { Button } from './ui/Button';
 
 interface Props {
   onClose: () => void;
@@ -46,9 +48,9 @@ export function ImportModal({ onClose, onDone }: Props) {
   const progressPct = totalPages ? Math.round((currentPage / totalPages) * 100) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg w-[420px] shadow-2xl p-6">
-        <h2 className="text-base font-semibold text-[var(--text)] mb-4">
+    <Modal onClose={onClose} width="w-[420px]">
+      <div className="p-6">
+        <h2 className="text-base font-semibold text-ink mb-4">
           {phase === 'running' ? 'Importing from GitHub Stars' :
            phase === 'done' ? (result?.cancelled ? 'Import cancelled' : 'Import complete') :
            'Import failed'}
@@ -56,31 +58,30 @@ export function ImportModal({ onClose, onDone }: Props) {
 
         {phase === 'running' && (
           <>
-            <p className="text-sm text-[var(--muted)] mb-3">
+            <p className="text-sm text-muted mb-3">
               {progress ? `Fetching page ${progress.page}${totalPages ? ` of ${totalPages}` : ''}…` : 'Starting…'}
             </p>
 
-            {/* Progress bar */}
-            <div className="h-1.5 bg-[var(--border)] rounded-full overflow-hidden mb-2">
+            <div className="h-1.5 bg-surface rounded-full overflow-hidden mb-2">
               {progressPct !== null ? (
                 <div
-                  className="h-full bg-[var(--amber)] rounded-full transition-all duration-300"
+                  className="h-full bg-brand rounded-full transition-all duration-300"
                   style={{ width: `${progressPct}%` }}
                 />
               ) : (
-                <div className="h-full bg-[var(--amber)] rounded-full animate-pulse w-1/3" />
+                <div className="h-full bg-brand rounded-full animate-pulse w-1/3" />
               )}
             </div>
 
             {progress && (
-              <p className="text-xs text-[var(--muted)] mb-4">
+              <p className="text-xs text-muted mb-4">
                 {progress.repos_fetched} repos fetched
               </p>
             )}
 
             <button
               onClick={handleCancel}
-              className="text-sm text-[var(--muted)] hover:text-[var(--text)] border border-[var(--border)] px-4 py-1.5 rounded transition-colors"
+              className="text-sm text-muted hover:text-ink border border-border px-4 py-1.5 rounded transition-colors"
             >
               Cancel
             </button>
@@ -89,42 +90,39 @@ export function ImportModal({ onClose, onDone }: Props) {
 
         {phase === 'done' && result && (
           <>
-            <div className="text-sm text-[var(--text)] space-y-1 mb-4">
+            <div className="text-sm text-ink space-y-1 mb-4">
               {result.cancelled ? (
                 <p>Cancelled — imported <strong>{result.imported}</strong> repos ({result.pages_fetched} pages fetched)</p>
               ) : (
                 <>
                   <p>Imported <strong>{result.imported}</strong> repos</p>
                   {result.already_exists > 0 && (
-                    <p className="text-[var(--muted)]">{result.already_exists} already in your library</p>
+                    <p className="text-muted">{result.already_exists} already in your library</p>
                   )}
                   {result.error && (
-                    <p className="text-yellow-500">Partial import: {result.error}</p>
+                    <p className="text-warn">Partial import: {result.error}</p>
                   )}
                 </>
               )}
             </div>
-            <button
-              onClick={onClose}
-              className="bg-[var(--amber)] text-[#0C0C0E] px-4 py-1.5 rounded text-sm font-medium hover:opacity-90 transition-opacity"
-            >
+            <Button variant="primary" onClick={onClose} className="text-sm px-4 py-1.5">
               Done
-            </button>
+            </Button>
           </>
         )}
 
         {phase === 'error' && (
           <>
-            <p className="text-sm text-red-400 mb-4">{error}</p>
+            <p className="text-sm text-danger mb-4">{error}</p>
             <button
               onClick={onClose}
-              className="text-sm text-[var(--muted)] hover:text-[var(--text)] border border-[var(--border)] px-4 py-1.5 rounded transition-colors"
+              className="text-sm text-muted hover:text-ink border border-border px-4 py-1.5 rounded transition-colors"
             >
               Close
             </button>
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }
