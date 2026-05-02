@@ -6,7 +6,7 @@ import { ImportStars } from './scenes/ImportStars';
 import { Done } from './scenes/Done';
 import {
   CONNECT_IDLE, CONNECT_VALIDATED,
-  IMPORT_PEAK, IMPORT_CALMED, DONE as DONE_PRESET,
+  IMPORT_PEAK, IMPORT_CALMED, IMPORT_DONE, DONE as DONE_PRESET,
   type SceneParams,
 } from '../../lib/orbScenes';
 
@@ -23,12 +23,17 @@ export function OnboardingFlow({
 }) {
   const stageRef = useRef<StageHandle>(null);
   const [step, setStep] = useState<Step>(1);
+  const breathTimeoutsRef = useRef<number[]>([]);
 
   function setSceneSafe(target: SceneParams, transitionMs?: number) {
     stageRef.current?.engine?.setScene(target, transitionMs);
   }
   function spawnSafe(n: number) {
     stageRef.current?.engine?.spawn(n);
+  }
+  function clearBreathTimeouts() {
+    breathTimeoutsRef.current.forEach((id) => clearTimeout(id));
+    breathTimeoutsRef.current = [];
   }
 
   // Initial scene = WELCOME (set on engine attach via OrbEngine default)
@@ -48,11 +53,25 @@ export function OnboardingFlow({
   }
 
   function goToStep4() {
+    clearBreathTimeouts();
     setSceneSafe(DONE_PRESET, 800);
     setStep(4);
   }
 
+  function settleImport() {
+    clearBreathTimeouts();
+    setSceneSafe(IMPORT_DONE, 800);
+    const t1 = window.setTimeout(() => {
+      setSceneSafe({ ...IMPORT_DONE, orbGlowMultiplier: 1.4 }, 300);
+    }, 800);
+    const t2 = window.setTimeout(() => {
+      setSceneSafe(IMPORT_DONE, 300);
+    }, 1100);
+    breathTimeoutsRef.current = [t1, t2];
+  }
+
   function calmImport() {
+    clearBreathTimeouts();
     setSceneSafe(IMPORT_CALMED, 800);
   }
 
@@ -85,6 +104,7 @@ export function OnboardingFlow({
           {step === 3 && (
             <ImportStars
               onSpawn={spawnSafe}
+              onSettle={settleImport}
               onCalm={calmImport}
               onContinue={goToStep4}
             />
