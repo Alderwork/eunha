@@ -21,11 +21,11 @@ export const Stage = forwardRef<StageHandle, {}>(function Stage(_, ref) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = Math.floor(rect.width * dpr);
-    canvas.height = Math.floor(rect.height * dpr);
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
+    const SIZE = 480;
+    canvas.width = SIZE * dpr;
+    canvas.height = SIZE * dpr;
+    canvas.style.width = `${SIZE}px`;
+    canvas.style.height = `${SIZE}px`;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.scale(dpr, dpr);
 
@@ -47,20 +47,20 @@ export const Stage = forwardRef<StageHandle, {}>(function Stage(_, ref) {
 
   return (
     <div className="relative w-[480px] h-[480px] mx-auto">
-      {/* Static orb image — always visible underneath the canvas */}
-      <img
-        src={eunhaOrb}
-        alt=""
-        className="absolute left-1/2 top-1/2 w-32 h-32 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none"
-        draggable={false}
-      />
-      {/* Canvas overlay for particles + glow (skipped under reduced-motion) */}
+      {/* Canvas underlay for particles + glow (skipped under reduced-motion) — renders behind the orb */}
       {!reducedMotion.current && (
         <canvas
           ref={canvasRef}
           className="absolute inset-0 pointer-events-none"
         />
       )}
+      {/* Static orb image — sits on top so particles converge behind it */}
+      <img
+        src={eunhaOrb}
+        alt=""
+        className="absolute left-1/2 top-1/2 w-32 h-32 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none"
+        draggable={false}
+      />
     </div>
   );
 });

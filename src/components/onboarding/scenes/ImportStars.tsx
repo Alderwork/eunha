@@ -33,26 +33,28 @@ export function ImportStars({
   const startedRef = useRef(false);
 
   useEffect(() => {
+    const t = setTimeout(() => setContinueEnabled(true), 1500);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
 
     const start = Date.now();
     let unlistenProgress: (() => void) | null = null;
-    let gateTimer: ReturnType<typeof setTimeout> | null = null;
 
     listen<ProgressPayload>('import:progress', (e) => {
       onSpawn(e.payload.delta);
       setCount(e.payload.repos_fetched);
     }).then((fn) => { unlistenProgress = fn; });
 
-    gateTimer = setTimeout(() => setContinueEnabled(true), 1500);
-
     invoke<ImportResult>('import_stars')
       .then((result) => {
+        setContinueEnabled(true);
         if (result.error) {
           setError(`Imported ${result.imported} so far — ${result.error}`);
           onCalm();
-          setContinueEnabled(true);
           return;
         }
         const elapsed = Date.now() - start;
@@ -67,7 +69,6 @@ export function ImportStars({
 
     return () => {
       unlistenProgress?.();
-      if (gateTimer) clearTimeout(gateTimer);
     };
   }, [onSpawn, onCalm]);
 
