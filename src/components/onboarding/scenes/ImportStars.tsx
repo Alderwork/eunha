@@ -37,6 +37,7 @@ export function ImportStars({
   const [continueEnabled, setContinueEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  const settleTimeoutRef = useRef<number | null>(null);
 
   // Gate timer (no startedRef guard — StrictMode-safe)
   useEffect(() => {
@@ -70,7 +71,7 @@ export function ImportStars({
         setPhase('done');
         const elapsed = Date.now() - start;
         const wait = Math.max(0, 800 - elapsed);
-        setTimeout(onSettle, wait);
+        settleTimeoutRef.current = window.setTimeout(onSettle, wait);
       })
       .catch((e) => {
         setError(`Import failed — ${e}`);
@@ -81,6 +82,10 @@ export function ImportStars({
 
     return () => {
       unlistenProgress?.();
+      if (settleTimeoutRef.current !== null) {
+        clearTimeout(settleTimeoutRef.current);
+        settleTimeoutRef.current = null;
+      }
     };
   }, [onSpawn, onSettle, onCalm]);
 
@@ -103,7 +108,7 @@ export function ImportStars({
   return (
     <div className="text-center">
       <h2 className="text-lg font-semibold text-ink mb-2">{title}</h2>
-      <p className="text-sm text-muted mb-6 tabular-nums">{subtext || ' '}</p>
+      <p className="text-sm text-muted mb-6 tabular-nums">{subtext || ' '}</p>
 
       <Button
         variant="primary"
