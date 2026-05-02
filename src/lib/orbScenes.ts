@@ -66,3 +66,12 @@ export const DONE: SceneParams = {
   ambientCount: 8,
   orbGlowMultiplier: 1.2,
 };
+
+export const IMPORT_DONE: SceneParams = {
+  spawnRate: 0,
+  gravityToCenter: 0,
+  drag: 0.96,
+  trailLength: 1,
+  ambientCount: 0,
+  orbGlowMultiplier: 1.0,
+};
