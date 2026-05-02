@@ -130,3 +130,15 @@ input, textarea, select {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-muted);
 }
+
+/* Continue-button wake: one-shot ring expansion when import completes. */
+@keyframes ctaWake {
+  0%   { box-shadow: 0 0 0 0   rgba(94, 106, 210, 0.5); }
+  100% { box-shadow: 0 0 0 16px rgba(94, 106, 210, 0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-cta-wake {
+    animation: ctaWake 1s ease-out 1;
+  }
+}
