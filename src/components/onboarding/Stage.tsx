@@ -1,6 +1,6 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { OrbEngine } from '../../lib/orbEngine';
-import eunhaSvg from '../../assets/eunha.svg';
+import eunhaOrb from '../../assets/eunha-orb.png';
 
 export type StageHandle = {
   engine: OrbEngine | null;
@@ -49,7 +49,7 @@ export const Stage = forwardRef<StageHandle, {}>(function Stage(_, ref) {
     <div className="relative w-[480px] h-[480px] mx-auto">
       {/* Static orb image — always visible underneath the canvas */}
       <img
-        src={eunhaSvg}
+        src={eunhaOrb}
         alt=""
         className="absolute left-1/2 top-1/2 w-32 h-32 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none"
         draggable={false}
