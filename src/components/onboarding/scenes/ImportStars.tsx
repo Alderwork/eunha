@@ -114,7 +114,7 @@ export function ImportStars({
         variant="primary"
         onClick={onContinue}
         disabled={!continueEnabled}
-        className="w-full px-4 py-2 text-sm"
+        className={`w-full px-4 py-2 text-sm ${phase === 'done' ? 'animate-cta-wake' : ''}`}
       >
         Continue
       </Button>
