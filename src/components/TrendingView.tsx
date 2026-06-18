@@ -5,9 +5,17 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Repo } from '../types';
 import { useKeydown } from '../hooks/useKeydown';
 import { Kbd } from './ui/Kbd';
-import { RepoRow } from './RepoRow';
+import { Chip } from './ui/Chip';
+import { VariantToggle } from './ui/VariantToggle';
+import { RepoRowDense } from './repo-views/RepoRowDense';
+import { RepoRowComfy } from './repo-views/RepoRowComfy';
+import { RepoCardMasonry } from './repo-views/RepoCardMasonry';
 import { trendingRepoToRepo } from '../lib/adapters';
-import { getRowHeight } from '../lib/visuals';
+import { getLibraryRowHeight, ViewVariant } from '../lib/visuals';
+
+function formatStarCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
 
 export interface TrendingRepo {
   full_name: string;
@@ -46,9 +54,12 @@ interface Props {
   onBack: () => void;
   showToast: (msg: string, type?: 'info' | 'error' | 'warn') => void;
   onRepoAdded: (repo: Repo) => void;
+  viewVariant: ViewVariant;
+  onVariantChange: (v: ViewVariant) => void;
+  onSelectionChange?: (repo: Repo | null, fromClick: boolean) => void;
 }
 
-export function TrendingView({ onBack, showToast, onRepoAdded }: Props) {
+export function TrendingView({ onBack, showToast, onRepoAdded, viewVariant, onVariantChange, onSelectionChange }: Props) {
   const [repos, setRepos] = useState<TrendingRepo[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [timeRange, setTimeRange] = useState<TimeRange>('daily');
@@ -57,17 +68,25 @@ export function TrendingView({ onBack, showToast, onRepoAdded }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
+  const masonryScrollRef = useRef<HTMLDivElement>(null);
   const gPressedRef = useRef(false);
 
   const reposRef = useRef(repos);
   reposRef.current = repos;
   const selectedIdxRef = useRef(selectedIdx);
   selectedIdxRef.current = selectedIdx;
+  const variantRef = useRef(viewVariant);
+  variantRef.current = viewVariant;
 
   const rowVirtualizer = useVirtualizer({
-    count: repos.length,
+    count: viewVariant === 'masonry' ? 0 : repos.length,
     getScrollElement: () => listRef.current,
-    estimateSize: (i) => getRowHeight(trendingRepoToRepo(reposRef.current[i]), i === selectedIdxRef.current),
+    estimateSize: (i) =>
+      getLibraryRowHeight(
+        trendingRepoToRepo(reposRef.current[i]),
+        i === selectedIdxRef.current,
+        variantRef.current,
+      ),
     getItemKey: (i) => reposRef.current[i]?.full_name ?? i,
     overscan: 10,
   });
@@ -94,11 +113,28 @@ export function TrendingView({ onBack, showToast, onRepoAdded }: Props) {
   }, [timeRange, language]);
 
   useEffect(() => {
+    if (viewVariant === 'masonry') return;
     rowVirtualizer.measure();
     if (repos.length > 0) {
       rowVirtualizer.scrollToIndex(selectedIdx, { align: 'auto' });
     }
-  }, [selectedIdx]);
+  }, [selectedIdx, viewVariant]);
+
+  useEffect(() => {
+    if (viewVariant !== 'masonry') return;
+    const root = masonryScrollRef.current;
+    if (!root) return;
+    const card = root.querySelector<HTMLElement>(`[data-masonry-idx="${selectedIdx}"]`);
+    card?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIdx, viewVariant, repos.length]);
+
+  // Mirror the focused trending row to App's detail sidebar. Keyboard nav
+  // doesn't auto-open; row clicks do (fromClick=true at the call site).
+  useEffect(() => {
+    if (!onSelectionChange) return;
+    const trending = repos[selectedIdx] ?? null;
+    onSelectionChange(trending ? trendingRepoToRepo(trending) : null, false);
+  }, [selectedIdx, repos, onSelectionChange]);
 
   async function handleAdd(repo: TrendingRepo) {
     if (adding.has(repo.full_name)) return;
@@ -169,14 +205,15 @@ export function TrendingView({ onBack, showToast, onRepoAdded }: Props) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2 border-b border-border">
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2 border-b border-border gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-ink">Trending</span>
           <span className="text-[10px] font-mono text-accent border border-accent/40 px-1 py-0.5 rounded-[2px] leading-none">
             GITHUB
           </span>
+          <p className="text-xs text-muted ml-2">popular repos right now</p>
         </div>
-        <p className="text-xs text-muted">popular repos right now</p>
+        <VariantToggle value={viewVariant} onChange={onVariantChange} />
       </div>
 
       {/* Filter bar */}
@@ -214,66 +251,133 @@ export function TrendingView({ onBack, showToast, onRepoAdded }: Props) {
       </div>
 
       {/* List */}
-      <div ref={listRef} role="list" className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <span className="text-sm text-muted">Loading trending repos…</span>
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-full">
-            <span className="text-sm text-danger">{error}</span>
-          </div>
-        ) : repos.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <span className="text-sm text-muted">No trending repos found.</span>
-          </div>
-        ) : (
-          <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-            {rowVirtualizer.getVirtualItems().map((vItem) => {
-              const tRepo = repos[vItem.index];
-              const isSelected = vItem.index === selectedIdx;
-              const isAdding = adding.has(tRepo.full_name);
-              const repo = trendingRepoToRepo(tRepo);
+      {(() => {
+        if (loading) {
+          return (
+            <div className="flex-1 overflow-y-auto flex items-center justify-center">
+              <span className="text-sm text-muted">Loading trending repos…</span>
+            </div>
+          );
+        }
+        if (error) {
+          return (
+            <div className="flex-1 overflow-y-auto flex items-center justify-center">
+              <span className="text-sm text-danger">{error}</span>
+            </div>
+          );
+        }
+        if (repos.length === 0) {
+          return (
+            <div className="flex-1 overflow-y-auto flex items-center justify-center">
+              <span className="text-sm text-muted">No trending repos found.</span>
+            </div>
+          );
+        }
 
-              const rightExtra = (
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  {isAdding && <span className="text-xs text-accent">adding…</span>}
-                  <span className={`text-xs font-mono ${tRepo.stars_today != null ? 'text-warn' : 'text-faint'}`}>
-                    {tRepo.stars_today != null
-                      ? `+${tRepo.stars_today.toLocaleString()} today`
-                      : tRepo.total_stars != null
-                      ? `★ ${tRepo.total_stars >= 1000 ? `${(tRepo.total_stars / 1000).toFixed(1)}k` : tRepo.total_stars}`
-                      : '—'}
+        const buildRightExtra = (tRepo: TrendingRepo, isAdding: boolean) => {
+          const trendText = tRepo.stars_today != null
+            ? `+${tRepo.stars_today.toLocaleString()} today`
+            : tRepo.total_stars != null
+              ? `★ ${formatStarCount(tRepo.total_stars)}`
+              : '—';
+          const trendClass = tRepo.stars_today != null ? 'text-warn' : 'text-faint';
+
+          if (viewVariant === 'comfy') {
+            return (
+              <>
+                {isAdding && <Chip tone="accent">adding…</Chip>}
+                <span className={`text-xs font-mono ${trendClass}`}>{trendText}</span>
+                {tRepo.stars_today != null && tRepo.total_stars != null && (
+                  <span className="text-[10.5px] font-mono text-faint">
+                    ★ {formatStarCount(tRepo.total_stars)}
                   </span>
-                </div>
-              );
+                )}
+              </>
+            );
+          }
 
-              return (
-                <div
-                  key={tRepo.full_name}
-                  role="listitem"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    transform: `translateY(${vItem.start}px)`,
-                    opacity: isAdding ? 0.6 : 1,
-                  }}
-                >
-                  <RepoRow
-                    repo={repo}
-                    isSelected={isSelected}
-                    currentPromptVersion={0}
-                    onClick={() => setSelectedIdx(vItem.index)}
-                    rightExtra={rightExtra}
-                  />
-                </div>
-              );
-            })}
+          return (
+            <div className="flex items-center gap-2 text-xs">
+              {isAdding && <span className="text-accent">adding…</span>}
+              <span className={`font-mono whitespace-nowrap ${trendClass}`}>{trendText}</span>
+            </div>
+          );
+        };
+
+        if (viewVariant === 'masonry') {
+          return (
+            <div ref={masonryScrollRef} role="list" className="flex-1 overflow-y-auto px-3.5 pt-3.5 pb-1">
+              <div className="eunha-masonry-grid">
+                {repos.map((tRepo, i) => {
+                  const isSelected = i === selectedIdx;
+                  const isAdding = adding.has(tRepo.full_name);
+                  const repo = trendingRepoToRepo(tRepo);
+                  return (
+                    <div
+                      key={tRepo.full_name}
+                      role="listitem"
+                      style={{ opacity: isAdding ? 0.6 : 1 }}
+                    >
+                      <RepoCardMasonry
+                        repo={repo}
+                        index={i}
+                        isSelected={isSelected}
+                        currentPromptVersion={0}
+                        onClick={() => {
+                          setSelectedIdx(i);
+                          onSelectionChange?.(repo, true);
+                        }}
+                        rightExtra={buildRightExtra(tRepo, isAdding)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div ref={listRef} role="list" className="flex-1 overflow-y-auto">
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+              {rowVirtualizer.getVirtualItems().map((vItem) => {
+                const tRepo = repos[vItem.index];
+                const isSelected = vItem.index === selectedIdx;
+                const isAdding = adding.has(tRepo.full_name);
+                const repo = trendingRepoToRepo(tRepo);
+                const rightExtra = buildRightExtra(tRepo, isAdding);
+                const RowComponent = viewVariant === 'dense' ? RepoRowDense : RepoRowComfy;
+
+                return (
+                  <div
+                    key={tRepo.full_name}
+                    role="listitem"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      transform: `translateY(${vItem.start}px)`,
+                      opacity: isAdding ? 0.6 : 1,
+                    }}
+                  >
+                    <RowComponent
+                      repo={repo}
+                      isSelected={isSelected}
+                      currentPromptVersion={0}
+                      onClick={() => {
+                        setSelectedIdx(vItem.index);
+                        onSelectionChange?.(repo, true);
+                      }}
+                      rightExtra={rightExtra}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Status bar */}
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-1.5 border-t border-border text-xs text-muted">

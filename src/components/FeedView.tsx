@@ -6,15 +6,37 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { FeedGroup, FeedFetchProgress, FeedFetchResult, Repo } from '../types';
 import { useKeydown } from '../hooks/useKeydown';
 import { Kbd } from './ui/Kbd';
-import { RepoRow } from './RepoRow';
+import { Chip } from './ui/Chip';
+import { VariantToggle } from './ui/VariantToggle';
+import { RepoRowDense } from './repo-views/RepoRowDense';
+import { RepoRowComfy } from './repo-views/RepoRowComfy';
+import { RepoCardMasonry } from './repo-views/RepoCardMasonry';
 import { feedGroupToRepo } from '../lib/adapters';
-import { getRowHeight } from '../lib/visuals';
+import { getLibraryRowHeight, ViewVariant } from '../lib/visuals';
 
 interface Props {
   onBack: () => void;
   onRepoAdded: (repo: Repo) => void;
   showToast: (msg: string, type?: 'info' | 'error' | 'warn') => void;
-  onDescribeRepo: (repo: Repo) => void;
+  // Triggers describe on the library copy of a feed item.
+  // If the item is not in library yet, App auto-adds it and then describes.
+  // Resolves to { wasAdded: true } when the auto-add path ran, so the feed
+  // row can be removed from view; throws on failure.
+  onDescribe: (repoFullName: string) => Promise<{ wasAdded: boolean }>;
+  // Set of repo IDs (== full_name) currently being described — surfaces the
+  // spinner on matching feed rows and the top progress bar.
+  describing: Set<string>;
+  viewVariant: ViewVariant;
+  onVariantChange: (v: ViewVariant) => void;
+  // Reports the focused feed row to App so the right detail sidebar can mirror it.
+  // `fromClick` is true when the change was a mouse click (auto-opens the sidebar).
+  onSelectionChange?: (repo: Repo | null, fromClick: boolean) => void;
+}
+
+function formatStarredBy(names: string[]): string {
+  if (names.length === 0) return '';
+  if (names.length <= 2) return names.join(', ');
+  return `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
 }
 
 function relativeTime(isoString: string): string {
@@ -30,7 +52,7 @@ function relativeTime(isoString: string): string {
   return `${months}mo ago`;
 }
 
-export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Props) {
+export function FeedView({ onBack, onRepoAdded, showToast, onDescribe, describing, viewVariant, onVariantChange, onSelectionChange }: Props) {
   const [groups, setGroups] = useState<FeedGroup[]>([]);
   const gPressedRef = useRef(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -41,16 +63,24 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
   const [hadItems, setHadItems] = useState(false);
   const [adding, setAdding] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null);
+  const masonryScrollRef = useRef<HTMLDivElement>(null);
 
   const groupsRef = useRef(groups);
   groupsRef.current = groups;
   const selectedIdxRef = useRef(selectedIdx);
   selectedIdxRef.current = selectedIdx;
+  const variantRef = useRef(viewVariant);
+  variantRef.current = viewVariant;
 
   const rowVirtualizer = useVirtualizer({
-    count: groups.length,
+    count: viewVariant === 'masonry' ? 0 : groups.length,
     getScrollElement: () => listRef.current,
-    estimateSize: (i) => getRowHeight(feedGroupToRepo(groupsRef.current[i]), i === selectedIdxRef.current),
+    estimateSize: (i) =>
+      getLibraryRowHeight(
+        feedGroupToRepo(groupsRef.current[i]),
+        i === selectedIdxRef.current,
+        variantRef.current,
+      ),
     getItemKey: (i) => groupsRef.current[i]?.repo_full_name ?? i,
     overscan: 8,
   });
@@ -111,11 +141,29 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
   }, []);
 
   useEffect(() => {
+    if (viewVariant === 'masonry') return;
     rowVirtualizer.measure();
     if (groups.length > 0) {
       rowVirtualizer.scrollToIndex(selectedIdx, { align: 'auto' });
     }
-  }, [selectedIdx]);
+  }, [selectedIdx, viewVariant]);
+
+  useEffect(() => {
+    if (viewVariant !== 'masonry') return;
+    const root = masonryScrollRef.current;
+    if (!root) return;
+    const card = root.querySelector<HTMLElement>(`[data-masonry-idx="${selectedIdx}"]`);
+    card?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIdx, viewVariant, groups.length]);
+
+  // Mirror the focused feed row to App's detail sidebar. Keyboard nav (this
+  // effect) doesn't auto-open; row clicks do, via the explicit fromClick=true
+  // call below.
+  useEffect(() => {
+    if (!onSelectionChange) return;
+    const group = groups[selectedIdx] ?? null;
+    onSelectionChange(group ? feedGroupToRepo(group) : null, false);
+  }, [selectedIdx, groups, onSelectionChange]);
 
   async function handleAdd(group: FeedGroup) {
     if (adding.has(group.repo_full_name)) return;
@@ -139,20 +187,17 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
     }
   }
 
-  async function handleAddAndDescribe(group: FeedGroup) {
+  async function handleDescribe(group: FeedGroup) {
     if (adding.has(group.repo_full_name)) return;
     setAdding((s) => new Set(s).add(group.repo_full_name));
     try {
-      const repo = await invoke<Repo>('add_feed_repo_to_library', {
-        repoFullName: group.repo_full_name,
-      });
-      onRepoAdded(repo);
-      setGroups((gs) => gs.filter((g) => g.repo_full_name !== group.repo_full_name));
-      setSelectedIdx((i) => Math.max(0, Math.min(i, groups.length - 2)));
-      showToast(`Added — describing in library…`);
-      onDescribeRepo(repo);
+      const result = await onDescribe(group.repo_full_name);
+      if (result.wasAdded) {
+        setGroups((gs) => gs.filter((g) => g.repo_full_name !== group.repo_full_name));
+        setSelectedIdx((i) => Math.max(0, Math.min(i, groups.length - 2)));
+      }
     } catch (e) {
-      showToast(`Failed: ${e}`, 'error');
+      showToast(`Describe failed: ${e}`, 'error');
     } finally {
       setAdding((s) => {
         const next = new Set(s);
@@ -197,7 +242,7 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
               setSelectedIdx((i) => Math.min(i + 10, groups.length - 1));
               break;
             }
-            if (group && !adding.has(group.repo_full_name)) handleAddAndDescribe(group);
+            if (group) handleDescribe(group);
             break;
           case 'u':
             if (e.ctrlKey) {
@@ -259,6 +304,7 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <VariantToggle value={viewVariant} onChange={onVariantChange} />
           {fetching && (
             <button
               onClick={() => {
@@ -318,91 +364,163 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
         </div>
       )}
 
+      {/* Describe progress — shown while any feed item's library copy is being described. */}
+      {describing.size > 0 && (
+        <div
+          className="eunha-progress-bar"
+          role="progressbar"
+          aria-label={`Describing ${describing.size} repo${describing.size !== 1 ? 's' : ''}`}
+        />
+      )}
+
       {/* Feed list */}
-      <div ref={listRef} role="list" className="flex-1 overflow-y-auto">
-        {groups.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-2">
-            {fetching ? (
-              <span className="text-sm text-muted">Fetching your network&apos;s activity…</span>
-            ) : fetchError ? (
-              <>
-                <span className="text-sm text-muted">Could not reach GitHub.</span>
-                <span className="text-xs text-muted opacity-60 text-center max-w-xs">
-                  {fetchError}
-                </span>
-                <span className="text-xs text-muted opacity-60 flex items-center gap-1">
-                  Check your connection, then press{' '}
-                  <Kbd>r</Kbd>
-                  {' '}to retry.
-                </span>
-              </>
-            ) : hadItems ? (
-              <>
-                <span className="text-sm text-muted">Inbox cleared.</span>
-                <span className="text-xs text-muted opacity-60 flex items-center gap-1">
-                  Press{' '}<Kbd>r</Kbd>{' '}to check for more.
-                </span>
-              </>
-            ) : lastFetchResult ? (
-              <>
-                <span className="text-sm text-muted">
-                  {lastFetchResult.users_total === 0
-                    ? "You don't follow anyone on GitHub yet."
-                    : `No new repos since last visit — checked ${lastFetchResult.users_total} users`}
-                </span>
-                <span className="text-xs text-muted opacity-60 flex items-center gap-1">
-                  Press{' '}<Kbd>r</Kbd>{' '}to refresh
-                </span>
-              </>
-            ) : (
-              <span className="text-sm text-muted">No new repos from your network.</span>
-            )}
-          </div>
-        ) : (
-          <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-            {rowVirtualizer.getVirtualItems().map((vItem) => {
-              const group = groups[vItem.index];
-              const isSelected = vItem.index === selectedIdx;
-              const isAdding = adding.has(group.repo_full_name);
-              const repo = feedGroupToRepo(group);
+      {(() => {
+        // Empty state — shared across all variants
+        if (groups.length === 0) {
+          return (
+            <div className="flex-1 overflow-y-auto">
+              <div className="flex flex-col items-center justify-center h-full gap-2">
+                {fetching ? (
+                  <span className="text-sm text-muted">Fetching your network&apos;s activity…</span>
+                ) : fetchError ? (
+                  <>
+                    <span className="text-sm text-muted">Could not reach GitHub.</span>
+                    <span className="text-xs text-muted opacity-60 text-center max-w-xs">
+                      {fetchError}
+                    </span>
+                    <span className="text-xs text-muted opacity-60 flex items-center gap-1">
+                      Check your connection, then press{' '}
+                      <Kbd>r</Kbd>
+                      {' '}to retry.
+                    </span>
+                  </>
+                ) : hadItems ? (
+                  <>
+                    <span className="text-sm text-muted">Inbox cleared.</span>
+                    <span className="text-xs text-muted opacity-60 flex items-center gap-1">
+                      Press{' '}<Kbd>r</Kbd>{' '}to check for more.
+                    </span>
+                  </>
+                ) : lastFetchResult ? (
+                  <>
+                    <span className="text-sm text-muted">
+                      {lastFetchResult.users_total === 0
+                        ? "You don't follow anyone on GitHub yet."
+                        : `No new repos since last visit — checked ${lastFetchResult.users_total} users`}
+                    </span>
+                    <span className="text-xs text-muted opacity-60 flex items-center gap-1">
+                      Press{' '}<Kbd>r</Kbd>{' '}to refresh
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm text-muted">No new repos from your network.</span>
+                )}
+              </div>
+            </div>
+          );
+        }
 
-              const rightExtra = (
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  {isAdding && <span className="text-xs text-accent">adding…</span>}
-                  <span className="text-xs text-faint">{relativeTime(group.latest_starred_at)}</span>
-                  <span className="text-xs text-muted truncate max-w-[120px]">
-                    {group.starred_by.slice(0, 2).join(', ')}
-                    {group.starred_by.length > 2 && ` +${group.starred_by.length - 2}`}
-                  </span>
-                </div>
-              );
+        // Build a per-variant rightExtra so feed metadata fits each layout's right slot.
+        const buildRightExtra = (group: FeedGroup, isAdding: boolean) => {
+          const time = relativeTime(group.latest_starred_at);
+          const starred = formatStarredBy(group.starred_by);
+          if (viewVariant === 'comfy') {
+            return (
+              <>
+                {isAdding && <Chip tone="accent">adding…</Chip>}
+                <span className="text-xs text-faint">{time}</span>
+                <span className="text-xs text-muted truncate max-w-[140px]">{starred}</span>
+              </>
+            );
+          }
+          // Dense + Masonry → single inline line
+          return (
+            <div className="flex items-center gap-2 text-xs">
+              {isAdding && <span className="text-accent">adding…</span>}
+              <span className="text-faint whitespace-nowrap">{time}</span>
+              {starred && (
+                <span className="text-muted truncate max-w-[140px]">· {starred}</span>
+              )}
+            </div>
+          );
+        };
 
-              return (
-                <div
-                  key={group.repo_full_name}
-                  role="listitem"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    transform: `translateY(${vItem.start}px)`,
-                    opacity: isAdding ? 0.6 : 1,
-                  }}
-                >
-                  <RepoRow
-                    repo={repo}
-                    isSelected={isSelected}
-                    currentPromptVersion={0}
-                    onClick={() => setSelectedIdx(vItem.index)}
-                    rightExtra={rightExtra}
-                  />
-                </div>
-              );
-            })}
+        if (viewVariant === 'masonry') {
+          return (
+            <div ref={masonryScrollRef} role="list" className="flex-1 overflow-y-auto px-3.5 pt-3.5 pb-1">
+              <div className="eunha-masonry-grid">
+                {groups.map((group, i) => {
+                  const isSelected = i === selectedIdx;
+                  const isAdding = adding.has(group.repo_full_name);
+                  const repo = feedGroupToRepo(group);
+                  return (
+                    <div
+                      key={group.repo_full_name}
+                      role="listitem"
+                      style={{ opacity: isAdding ? 0.6 : 1 }}
+                    >
+                      <RepoCardMasonry
+                        repo={repo}
+                        index={i}
+                        isSelected={isSelected}
+                        isDescribing={describing.has(group.repo_full_name)}
+                        currentPromptVersion={0}
+                        onClick={() => {
+                          setSelectedIdx(i);
+                          onSelectionChange?.(repo, true);
+                        }}
+                        rightExtra={buildRightExtra(group, isAdding)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div ref={listRef} role="list" className="flex-1 overflow-y-auto">
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+              {rowVirtualizer.getVirtualItems().map((vItem) => {
+                const group = groups[vItem.index];
+                const isSelected = vItem.index === selectedIdx;
+                const isAdding = adding.has(group.repo_full_name);
+                const repo = feedGroupToRepo(group);
+                const rightExtra = buildRightExtra(group, isAdding);
+                const RowComponent = viewVariant === 'dense' ? RepoRowDense : RepoRowComfy;
+
+                return (
+                  <div
+                    key={group.repo_full_name}
+                    role="listitem"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      transform: `translateY(${vItem.start}px)`,
+                      opacity: isAdding ? 0.6 : 1,
+                    }}
+                  >
+                    <RowComponent
+                      repo={repo}
+                      isSelected={isSelected}
+                      isDescribing={describing.has(group.repo_full_name)}
+                      currentPromptVersion={0}
+                      onClick={() => {
+                        setSelectedIdx(vItem.index);
+                        onSelectionChange?.(repo, true);
+                      }}
+                      rightExtra={rightExtra}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Action hint bar */}
       {selectedGroup && (
@@ -410,7 +528,7 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribeRepo }: Pro
           adding.has(selectedGroup.repo_full_name) ? 'opacity-40' : ''
         }`}>
           <span className="flex items-center gap-1"><Kbd>a</Kbd>{' '}add</span>
-          <span className="flex items-center gap-1"><Kbd>d</Kbd>{' '}add + describe</span>
+          <span className="flex items-center gap-1"><Kbd>d</Kbd>{' '}describe</span>
           <span className="flex items-center gap-1"><Kbd>o</Kbd>{' '}open</span>
           <span className="flex items-center gap-1"><Kbd>x</Kbd>{' '}dismiss</span>
         </div>

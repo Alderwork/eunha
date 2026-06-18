@@ -1,4 +1,5 @@
 use crate::db::{migrations, DbState};
+use crate::TrayState;
 use tauri::{AppHandle, State};
 
 pub(crate) fn get_secret(key: &str) -> Option<String> {
@@ -79,6 +80,9 @@ pub fn get_settings(
         .unwrap_or_else(|| "llama3".to_string());
     let output_language = migrations::settings_get(&conn, "output_language")
         .unwrap_or_else(|| "English".to_string());
+    let show_tray_icon = migrations::settings_get(&conn, "show_tray_icon")
+        .map(|v| v != "false")
+        .unwrap_or(true);
 
     Ok(serde_json::json!({
         "pat_set": !pat.is_empty(),
@@ -89,5 +93,24 @@ pub fn get_settings(
         "ollama_url": ollama_url,
         "ollama_model": ollama_model,
         "output_language": output_language,
+        "show_tray_icon": show_tray_icon,
     }))
+}
+
+#[tauri::command]
+pub fn set_tray_visible(
+    visible: bool,
+    tray_state: State<'_, TrayState>,
+    db_state: State<'_, DbState>,
+) -> Result<(), String> {
+    let conn = db_state.0.lock().map_err(|e| e.to_string())?;
+    migrations::settings_set(&conn, "show_tray_icon", if visible { "true" } else { "false" })
+        .map_err(|e| e.to_string())?;
+    drop(conn);
+
+    let lock = tray_state.0.lock().map_err(|e| e.to_string())?;
+    if let Some(tray) = lock.as_ref() {
+        tray.set_visible(visible).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }

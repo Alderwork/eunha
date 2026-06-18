@@ -84,3 +84,26 @@ export const COMPACT_HEIGHT = 56;
 export function getRowHeight(repo: Repo, isFocused: boolean): number {
   return isTallRow(repo, isFocused) ? TALL_HEIGHT : COMPACT_HEIGHT;
 }
+
+// Library view variants — user-selectable presentation of the repo list.
+export type ViewVariant = 'dense' | 'comfy' | 'masonry';
+
+export const DENSE_COMPACT_HEIGHT = 38;
+export const DENSE_SELECTED_HEIGHT = 78;
+export const COMFY_HEIGHT = 96;
+
+export function getLibraryRowHeight(
+  _repo: Repo,
+  isFocused: boolean,
+  variant: ViewVariant,
+): number {
+  switch (variant) {
+    case 'dense':
+      return isFocused ? DENSE_SELECTED_HEIGHT : DENSE_COMPACT_HEIGHT;
+    case 'comfy':
+      return COMFY_HEIGHT;
+    case 'masonry':
+      // Masonry renders without virtualization; this height is unused.
+      return 0;
+  }
+}

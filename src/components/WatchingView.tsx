@@ -4,7 +4,25 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { useKeydown } from '../hooks/useKeydown';
+
+const RELEASE_BODY_SCHEMA = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'align'],
+  },
+};
+
+// Show "Read more" if either the raw body is long or contains many lines —
+// length alone misses short-but-tall release notes (lots of bullets / headings).
+function shouldShowReadMore(body: string): boolean {
+  if (body.length > 400) return true;
+  const lineBreaks = (body.match(/\n/g) ?? []).length;
+  return lineBreaks > 6;
+}
 import { Kbd } from './ui/Kbd';
 import { Repo, WatchedRepoEntry } from '../types';
 
@@ -582,37 +600,66 @@ export function WatchingView({ onBack, showToast, onRepoUpdated, onUnreadCountCh
 
                           {/* Body — inner content box like GitHub's gray area */}
                           {release.body && (
-                            <div className="rounded-md border border-border bg-bg overflow-hidden">
+                            <div className="rounded-md border border-border bg-bg overflow-hidden relative">
                               <div
-                                className={`px-4 py-3 text-[13px] text-dim leading-relaxed
-                                  ${isExpanded ? '' : 'line-clamp-6'}
-                                  [&_h1]:text-ink [&_h1]:font-bold [&_h1]:text-base [&_h1]:mt-3 [&_h1]:mb-2 [&_h1]:pb-1 [&_h1]:border-b [&_h1]:border-border
+                                style={
+                                  isExpanded
+                                    ? undefined
+                                    : {
+                                        maxHeight: '12rem',
+                                        WebkitMaskImage:
+                                          'linear-gradient(to bottom, black 70%, transparent 100%)',
+                                        maskImage:
+                                          'linear-gradient(to bottom, black 70%, transparent 100%)',
+                                      }
+                                }
+                                className={`px-4 py-3 text-[13px] text-dim leading-relaxed overflow-hidden
+                                  [&_h1]:text-ink [&_h1]:font-semibold [&_h1]:text-base [&_h1]:mt-3 [&_h1]:mb-2 [&_h1]:pb-1 [&_h1]:border-b [&_h1]:border-border
                                   [&_h2]:text-ink [&_h2]:font-semibold [&_h2]:text-sm [&_h2]:mt-2.5 [&_h2]:mb-1.5
                                   [&_h3]:text-dim [&_h3]:font-semibold [&_h3]:text-xs [&_h3]:mt-2 [&_h3]:mb-1
-                                  [&_strong]:text-dim
+                                  [&_p]:my-1.5
+                                  [&_strong]:text-ink
                                   [&_a]:text-accent [&_a]:underline
-                                  [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:my-0.5
+                                  [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1.5 [&_li]:my-0.5
                                   [&_code]:bg-surface [&_code]:px-1 [&_code]:rounded [&_code]:text-[12px] [&_code]:text-dim
                                   [&_pre]:bg-surface [&_pre]:rounded-md [&_pre]:p-3 [&_pre]:text-[12px] [&_pre]:overflow-x-auto [&_pre]:my-2
                                   [&_hr]:border-border [&_hr]:my-2
-                                  [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted`}
+                                  [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted [&_blockquote]:my-2
+                                  [&_img]:max-w-full [&_img]:rounded
+                                  [&_table]:w-full [&_table]:my-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-ink [&_th]:border-b [&_th]:border-border [&_th]:pb-1 [&_td]:py-1 [&_td]:border-b [&_td]:border-border`}
                               >
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkGfm]}
+                                  rehypePlugins={[rehypeRaw, [rehypeSanitize, RELEASE_BODY_SCHEMA]]}
+                                >
                                   {release.body}
                                 </ReactMarkdown>
                               </div>
-                              {!isExpanded && release.body.length > 400 && (
-                                <div className="px-4 pb-3 border-t border-border bg-bg">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setExpandedReleases((prev) => new Set([...prev, release.id]));
-                                    }}
-                                    className="text-xs text-accent hover:underline mt-2"
-                                  >
-                                    Read more
-                                  </button>
-                                </div>
+                              {!isExpanded && shouldShowReadMore(release.body) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedReleases((prev) => new Set([...prev, release.id]));
+                                  }}
+                                  className="block w-full px-4 py-2 border-t border-border bg-bg text-left text-xs text-accent hover:bg-surface transition-colors"
+                                >
+                                  Read more
+                                </button>
+                              )}
+                              {isExpanded && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedReleases((prev) => {
+                                      const next = new Set(prev);
+                                      next.delete(release.id);
+                                      return next;
+                                    });
+                                  }}
+                                  className="block w-full px-4 py-2 border-t border-border bg-bg text-left text-xs text-muted hover:bg-surface hover:text-dim transition-colors"
+                                >
+                                  Show less
+                                </button>
                               )}
                             </div>
                           )}

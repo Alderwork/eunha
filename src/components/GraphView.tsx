@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import ForceGraph2D, { NodeObject, LinkObject, ForceGraphMethods } from 'react-force-graph-2d';
-import { FeedGroup } from '../types';
+import { FeedGroup, Repo } from '../types';
 
 interface GraphControls {
   showLabels: boolean;
@@ -48,6 +48,10 @@ interface GraphData {
 interface Props {
   showToast: (msg: string, type?: 'info' | 'error' | 'warn') => void;
   theme: 'dark' | 'light';
+  // Reports a clicked repo node to App so the right detail sidebar can mirror it.
+  // Repo is constructed from FeedGroup data (no LLM fields). fromClick is always
+  // true here since hover doesn't carry intent strong enough to flip the sidebar.
+  onSelectionChange?: (repo: Repo | null, fromClick: boolean) => void;
 }
 
 interface MyGithubInfo {
@@ -56,7 +60,7 @@ interface MyGithubInfo {
 }
 
 function getRepoRadius(starCount: number): number {
-  return Math.min(14, 5 + Math.sqrt(Math.max(0, starCount - 1)) * 3);
+  return Math.min(24, 5 + Math.sqrt(Math.max(0, starCount - 1)) * 6);
 }
 
 function buildGraph(groups: FeedGroup[], myLogin: string): GraphData {
@@ -105,7 +109,35 @@ function buildGraph(groups: FeedGroup[], myLogin: string): GraphData {
   return { nodes: Array.from(nodeMap.values()), links };
 }
 
-export function GraphView({ showToast, theme }: Props) {
+function graphNodeToRepo(n: GraphNode): Repo | null {
+  if (n.nodeType !== 'repo') return null;
+  return {
+    id: n.label,
+    full_name: n.label,
+    description: n.description ?? null,
+    url: n.url ?? `https://github.com/${n.label}`,
+    language: null,
+    stars_count: null,
+    topics: null,
+    added_at: null,
+    source: 'feed',
+    llm_summary: null,
+    llm_what: null,
+    llm_why: null,
+    llm_use_case: null,
+    llm_category: null,
+    llm_tags: null,
+    llm_generated_at: null,
+    prompt_version: null,
+    user_notes: null,
+    user_category: null,
+    watching: false,
+    category_locked: false,
+    owner_avatar_url: null,
+  };
+}
+
+export function GraphView({ showToast, theme, onSelectionChange }: Props) {
   const [loading, setLoading] = useState(true);
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [groupCount, setGroupCount] = useState(0);
@@ -251,8 +283,10 @@ export function GraphView({ showToast, theme }: Props) {
 
   const handleNodeClick = useCallback((node: NodeObject) => {
     const n = node as GraphNode;
+    const repo = graphNodeToRepo(n);
+    if (repo) onSelectionChange?.(repo, true);
     if (n.url) openUrl(n.url);
-  }, []);
+  }, [onSelectionChange]);
 
   const handleNodeHover = useCallback((node: NodeObject | null) => {
     setHoveredNode(node ? (node as GraphNode) : null);

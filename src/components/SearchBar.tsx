@@ -13,6 +13,7 @@ interface Props {
   searchRef: React.RefObject<HTMLInputElement | null>;
   aiStatus: AiStatus;
   onAiStatusChange: (s: AiStatus) => void;
+  trailing?: React.ReactNode;
 }
 
 export function SearchBar({
@@ -21,6 +22,7 @@ export function SearchBar({
   searchRef,
   aiStatus,
   onAiStatusChange,
+  trailing,
 }: Props) {
   return (
     <div className="flex-shrink-0 border-b border-border px-5 pt-4 pb-3">
@@ -52,7 +54,7 @@ export function SearchBar({
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1.5 mt-2.5">
+      <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
         {STATUS_PILLS.map(({ label, value }) => (
           <button
             key={label}
@@ -66,6 +68,7 @@ export function SearchBar({
             {label}
           </button>
         ))}
+        {trailing && <div className="ml-auto flex items-center">{trailing}</div>}
       </div>
     </div>
   );
