@@ -2,6 +2,7 @@ pub mod add;
 pub mod avatars;
 pub mod backup;
 pub mod describe;
+pub mod digest;
 pub mod feed;
 pub mod import;
 pub mod library;

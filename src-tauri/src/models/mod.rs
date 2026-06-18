@@ -125,3 +125,17 @@ pub struct FeedFetchResult {
     pub cancelled: bool,
     pub error: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DigestItem {
+    pub repo: Repo,
+    pub reason: String,
+    pub reason_detail: String,
+    pub action: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DigestBatch {
+    pub batch_date: String,
+    pub items: Vec<DigestItem>,
+}
