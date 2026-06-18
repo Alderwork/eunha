@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result};
 
-const CURRENT_SCHEMA_VERSION: u32 = 10;
+const CURRENT_SCHEMA_VERSION: u32 = 11;
 
 pub fn run(conn: &Connection) -> Result<()> {
     // WAL mode MUST be set before any schema changes — enables concurrent reads+writes
@@ -212,6 +212,26 @@ pub fn run(conn: &Connection) -> Result<()> {
         ")?;
     }
 
+    if version < 11 {
+        conn.execute_batch("
+            ALTER TABLE repos ADD COLUMN resurface_archived INTEGER NOT NULL DEFAULT 0;
+
+            CREATE TABLE IF NOT EXISTS digest_items (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                repo_id       TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+                batch_date    TEXT NOT NULL,
+                reason        TEXT NOT NULL,
+                reason_detail TEXT,
+                score         REAL,
+                surfaced_at   TEXT NOT NULL DEFAULT (datetime('now')),
+                action        TEXT,
+                action_at     TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_digest_batch ON digest_items(batch_date);
+            CREATE INDEX IF NOT EXISTS idx_digest_repo  ON digest_items(repo_id);
+        ")?;
+    }
+
     conn.execute_batch(&format!("PRAGMA user_version = {};", CURRENT_SCHEMA_VERSION))?;
 
     Ok(())
@@ -400,5 +420,40 @@ mod tests {
             )
             .unwrap();
         assert_eq!(idx_count, 1, "idx_tracked_enabled should exist");
+    }
+
+    #[test]
+    fn migration_v11_creates_digest_schema() {
+        let conn = open_test_db();
+
+        // New column is writable.
+        conn.execute("UPDATE repos SET resurface_archived = 1 WHERE 1 = 0", [])
+            .expect("resurface_archived column missing");
+
+        // digest_items round-trips (FK + defaults).
+        conn.execute(
+            "INSERT INTO repos (id, full_name, url, source) VALUES ('a/b','a/b','https://x','manual')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO digest_items (repo_id, batch_date, reason, reason_detail, score)
+             VALUES ('a/b', date('now'), 'forgotten', '7', 1.5)",
+            [],
+        )
+        .unwrap();
+        let cnt: i64 = conn
+            .query_row("SELECT COUNT(*) FROM digest_items", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cnt, 1);
+
+        let idx: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_digest_batch'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(idx, 1, "idx_digest_batch should exist");
     }
 }
