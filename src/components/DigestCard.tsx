@@ -57,7 +57,7 @@ export function DigestCard({ batch, describing, onClose, onOpen, onDescribe, onE
   );
 
   const handle = useCallback(
-    async (idx: number, key: string) => {
+    async (idx: number, key: 'o' | 'd' | 'e' | 'x') => {
       const item = items[idx];
       if (!item) return;
       const repo = item.repo;
@@ -74,8 +74,8 @@ export function DigestCard({ batch, describing, onClose, onOpen, onDescribe, onE
                 : it,
             ),
           );
+          setAction(repo.id, 'described');
         }
-        setAction(repo.id, 'described');
       } else if (key === 'e') {
         onEdit(repo);
       } else if (key === 'x') {
