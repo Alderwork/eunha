@@ -5,13 +5,15 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
-import { Repo, CategoryCount, AppConstants, BatchDescribeProgress, BatchDescribeResult } from './types';
+import { Repo, CategoryCount, AppConstants, BatchDescribeProgress, BatchDescribeResult, DigestBatch } from './types';
 import { useKeydown } from './hooks/useKeydown';
-import { RepoRow } from './components/RepoRow';
+import { RepoRowDense } from './components/repo-views/RepoRowDense';
+import { RepoRowComfy } from './components/repo-views/RepoRowComfy';
+import { RepoCardMasonry } from './components/repo-views/RepoCardMasonry';
 import { SearchBar } from './components/SearchBar';
-import { DetailPanel } from './components/DetailPanel';
+import { RepoDetailSidebar } from './components/RepoDetailSidebar';
 import { EditPanel } from './components/EditPanel';
-import { SettingsModal } from './components/SettingsModal';
+import { SettingsView } from './components/SettingsView';
 import { ImportModal } from './components/ImportModal';
 import { AddRepoModal } from './components/AddRepoModal';
 import { KeybindingHelp } from './components/KeybindingHelp';
@@ -25,12 +27,14 @@ import { ReadmeView, ReadmeTab } from './components/ReadmeView';
 import { CategorySidebar } from './components/CategorySidebar';
 import { Button } from './components/ui/Button';
 import { Kbd } from './components/ui/Kbd';
+import { VariantToggle } from './components/ui/VariantToggle';
 import { OnboardingFlow, type OnboardingCompleteOpts } from './components/onboarding/OnboardingFlow';
-import { getRowHeight } from './lib/visuals';
+import { DigestCard } from './components/DigestCard';
+import { getLibraryRowHeight, ViewVariant } from './lib/visuals';
 import eunhaLogo from './assets/eunha-orb.png';
 
-type Modal = 'settings' | 'import' | 'add' | 'help' | null;
-type ViewMode = 'library' | 'feed' | 'watching' | 'graph' | 'trending' | 'readme';
+type Modal = 'import' | 'add' | 'help' | null;
+type ViewMode = 'library' | 'feed' | 'watching' | 'graph' | 'trending' | 'readme' | 'settings';
 
 export default function App() {
   const [repos, setRepos] = useState<Repo[]>([]);
@@ -89,6 +93,9 @@ export default function App() {
   const [onboardingState, setOnboardingState] = useState<'loading' | 'show' | 'done'>('loading');
   const [pendingAddModal, setPendingAddModal] = useState(false);
 
+  const [digest, setDigest] = useState<DigestBatch | null>(null);
+  const digestCheckedRef = useRef(false);
+
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('eunha-theme') as 'dark' | 'light' | null;
     if (saved) return saved;
@@ -100,6 +107,27 @@ export default function App() {
     localStorage.setItem('eunha-theme', theme);
   }, [theme]);
 
+  const [viewVariant, setViewVariant] = useState<ViewVariant>(() => {
+    const saved = localStorage.getItem('eunha-view-variant') as ViewVariant | null;
+    return saved === 'dense' || saved === 'comfy' || saved === 'masonry' ? saved : 'dense';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('eunha-view-variant', viewVariant);
+  }, [viewVariant]);
+
+  // Right-side repo detail sidebar — `i` toggles, click on a repo auto-opens.
+  const [detailOpen, setDetailOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('eunha-detail-open');
+    return saved === null ? true : saved === '1';
+  });
+  useEffect(() => {
+    localStorage.setItem('eunha-detail-open', detailOpen ? '1' : '0');
+  }, [detailOpen]);
+
+  // Selection emitted by feed/trending/graph views. Library uses repos[selectedIdx] directly.
+  const [externalSelectedRepo, setExternalSelectedRepo] = useState<Repo | null>(null);
+
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const gPressedRef = useRef(false);
@@ -108,10 +136,18 @@ export default function App() {
   const selectedIdxRef = useRef(selectedIdx);
   selectedIdxRef.current = selectedIdx;
 
+  const variantRef = useRef(viewVariant);
+  variantRef.current = viewVariant;
+
   const rowVirtualizer = useVirtualizer({
-    count: repos.length,
+    count: viewVariant === 'masonry' ? 0 : repos.length,
     getScrollElement: () => listRef.current,
-    estimateSize: (i) => getRowHeight(reposRef.current[i], i === selectedIdxRef.current),
+    estimateSize: (i) =>
+      getLibraryRowHeight(
+        reposRef.current[i],
+        i === selectedIdxRef.current,
+        variantRef.current,
+      ),
     getItemKey: (i) => reposRef.current[i]?.id ?? i,
     overscan: 10,
   });
@@ -214,9 +250,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    listen('tray:open-settings', () => {
+      setSplitPane(null);
+      setFocusedSide('left');
+      setViewMode('settings');
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, []);
+
+  useEffect(() => {
+    if (viewVariant === 'masonry') return;
     rowVirtualizer.measure();
     rowVirtualizer.scrollToIndex(selectedIdx, { align: 'auto' });
-  }, [selectedIdx]);
+  }, [selectedIdx, viewVariant]);
+
+  // Masonry has no virtualizer; scroll the selected card into view directly.
+  const masonryScrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (viewVariant !== 'masonry') return;
+    const root = masonryScrollRef.current;
+    if (!root) return;
+    const card = root.querySelector<HTMLElement>(`[data-masonry-idx="${selectedIdx}"]`);
+    card?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIdx, viewVariant, repos.length]);
 
   useEffect(() => {
     if (onboardingState === 'done' && pendingAddModal) {
@@ -225,10 +282,19 @@ export default function App() {
     }
   }, [onboardingState, pendingAddModal]);
 
+  useEffect(() => {
+    if (onboardingState !== 'done' || digestCheckedRef.current) return;
+    digestCheckedRef.current = true;
+    invoke<DigestBatch | null>('get_launch_digest')
+      .then((b) => {
+        if (b && b.items.length > 0) setDigest(b);
+      })
+      .catch(() => {});
+  }, [onboardingState]);
+
   const showCategories = (viewMode === 'library' || viewMode === 'watching') && categories.length > 0;
 
   const selectedRepo = repos[selectedIdx] ?? null;
-  const isDescribing = selectedRepo ? describing.has(selectedRepo.id) : false;
   const isEditing = selectedRepo ? editingId === selectedRepo.id : false;
 
   async function describeRepo(repo: Repo) {
@@ -245,6 +311,35 @@ export default function App() {
         const next = new Set(s);
         next.delete(repo.id);
         return next;
+      });
+    }
+  }
+
+  function openDigest() {
+    invoke<DigestBatch | null>('get_current_digest')
+      .then((b) => {
+        if (b && b.items.length > 0) setDigest(b);
+        else showToast('아직 리서핑할 배치가 없어요');
+      })
+      .catch(() => {});
+  }
+
+  async function describeRepoReturning(repo: Repo): Promise<Repo | null> {
+    if (describing.has(repo.id)) return null;
+    setDescribing((s) => new Set(s).add(repo.id));
+    try {
+      const updated = await invoke<Repo>('describe_repo', { repoId: repo.id });
+      setRepos((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
+      loadCategories();
+      return updated;
+    } catch (e) {
+      showToast(`Describe failed — ${e}`, 'error');
+      return null;
+    } finally {
+      setDescribing((s) => {
+        const n = new Set(s);
+        n.delete(repo.id);
+        return n;
       });
     }
   }
@@ -303,7 +398,27 @@ export default function App() {
   const focusedView: ViewMode = focusedSide === 'right' && splitPane ? splitPane.view : viewMode;
   const focusedActiveReadmeTabId = focusedSide === 'right' && splitPane ? splitPane.activeReadmeTabId : activeReadmeTabId;
 
+  // Sidebar reflects the focused view's selection. Library/watching pull from
+  // App's selectedRepo; readme pulls the active tab's library row; other views
+  // push their selection via setExternalSelectedRepo.
+  const sidebarRepo: Repo | null = (() => {
+    if (focusedView === 'library' || focusedView === 'watching') return selectedRepo;
+    if (focusedView === 'readme' && focusedActiveReadmeTabId) {
+      return repos.find((r) => r.id === focusedActiveReadmeTabId) ?? null;
+    }
+    return externalSelectedRepo;
+  })();
+  const sidebarIsDescribing = sidebarRepo ? describing.has(sidebarRepo.id) : false;
+
   function setFocusedView(v: ViewMode) {
+    // Settings is a full-page workflow — close any open split pane so it has
+    // the whole canvas, regardless of which side currently has focus.
+    if (v === 'settings') {
+      setSplitPane(null);
+      setFocusedSide('left');
+      setViewMode('settings');
+      return;
+    }
     // Library only renders fully on the left pane. Choosing it from the right hops focus.
     if (v === 'library' && focusedSide === 'right') {
       setFocusedSide('left');
@@ -372,7 +487,25 @@ export default function App() {
           return;
         }
 
-        if (modal !== null || isInput) return;
+        if (modal !== null || isInput || digest) return;
+
+        // Esc inside the settings page returns to the library and refreshes
+        // patMissing so the import button gating stays accurate.
+        if (focusedView === 'settings' && e.key === 'Escape') {
+          e.preventDefault();
+          setViewMode('library');
+          invoke<{ pat_set: boolean }>('get_settings')
+            .then((s) => setPatMissing(!s.pat_set))
+            .catch(() => {});
+          return;
+        }
+
+        // Toggle the right repo-detail sidebar (i). Works from any view.
+        if (e.key === 'i' && !editingId) {
+          e.preventDefault();
+          setDetailOpen((v) => !v);
+          return;
+        }
 
         // Toggle split pane (\). Closes the right pane if open, opens it cloning left's view if not.
         if (e.key === '\\' && !editingId) {
@@ -459,7 +592,7 @@ export default function App() {
           return;
         }
 
-        if (focusedView === 'feed' || focusedView === 'watching' || focusedView === 'graph' || focusedView === 'trending') return;
+        if (focusedView === 'feed' || focusedView === 'watching' || focusedView === 'graph' || focusedView === 'trending' || focusedView === 'settings') return;
 
         const repo = repos[selectedIdx];
 
@@ -548,10 +681,14 @@ export default function App() {
               );
               setFocusedActiveReadmeTabId(repo.id);
               setFocusedView('readme');
+              setDetailOpen(true);
             }
             break;
           case ',':
-            setModal('settings');
+            setFocusedView('settings');
+            break;
+          case 'R':
+            if (!editingId) openDigest();
             break;
           case '?':
             setModal('help');
@@ -561,9 +698,9 @@ export default function App() {
             break;
         }
       },
-      [repos, selectedIdx, modal, editingId, describing, batchRunning, viewMode, readmeTabs, activeReadmeTabId, splitPane, focusedSide]
+      [repos, selectedIdx, modal, editingId, describing, batchRunning, viewMode, readmeTabs, activeReadmeTabId, splitPane, focusedSide, digest]
     ),
-    [repos, selectedIdx, modal, editingId, describing, batchRunning, viewMode, readmeTabs, activeReadmeTabId, splitPane, focusedSide]
+    [repos, selectedIdx, modal, editingId, describing, batchRunning, viewMode, readmeTabs, activeReadmeTabId, splitPane, focusedSide, digest]
   );
 
   async function handleOnboardingComplete(opts: OnboardingCompleteOpts) {
@@ -641,9 +778,16 @@ export default function App() {
         onMouseDown={handleDragRegionMouseDown}
         className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-border"
       >
-        <div data-tauri-drag-region className="flex items-center gap-2 select-none pointer-events-none">
-          <img src={eunhaLogo} alt="eunha" className="w-5 h-5" />
-          <span className="text-sm font-semibold text-accent tracking-wide">eunha</span>
+        <div data-tauri-drag-region className="flex items-center gap-2 select-none">
+          <button
+            data-no-drag
+            onClick={openDigest}
+            title="이번 주 리서핑 (shift-R)"
+            className="pointer-events-auto"
+          >
+            <img src={eunhaLogo} alt="eunha" className="w-5 h-5" />
+          </button>
+          <span className="text-sm font-semibold text-accent tracking-wide pointer-events-none">eunha</span>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setModal('add')} className="text-xs px-2 py-1">
@@ -653,7 +797,7 @@ export default function App() {
             onClick={() => {
               if (patMissing) {
                 showToast('Set your GitHub PAT in Settings first', 'warn');
-                setModal('settings');
+                setFocusedView('settings');
               } else {
                 setModal('import');
               }
@@ -670,7 +814,7 @@ export default function App() {
             {theme === 'dark' ? '☀' : '◑'}
           </Button>
           <Button
-            onClick={() => setModal('settings')}
+            onClick={() => setFocusedView('settings')}
             className="text-xs px-2 py-1"
             title="Settings (,)"
           >
@@ -801,11 +945,13 @@ export default function App() {
                 onClick={() => {
                   setFocusedActiveReadmeTabId(tab.repoId);
                   setFocusedView('readme');
+                  setDetailOpen(true);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     setFocusedActiveReadmeTabId(tab.repoId);
                     setFocusedView('readme');
+                    setDetailOpen(true);
                   }
                 }}
                 className={`flex items-center gap-2 pl-3 pr-2 py-2 border-r border-border cursor-pointer min-w-0 select-none ${
@@ -838,7 +984,14 @@ export default function App() {
         >
           {/* GraphView is always mounted to preserve d3 simulation + avatar cache */}
           <div className={viewMode === 'graph' ? 'flex flex-col flex-1 overflow-hidden' : 'hidden'}>
-            <GraphView showToast={showToast} theme={theme} />
+            <GraphView
+              showToast={showToast}
+              theme={theme}
+              onSelectionChange={(repo, fromClick) => {
+                setExternalSelectedRepo(repo);
+                if (fromClick) setDetailOpen(true);
+              }}
+            />
           </div>
           {/* ReadmeView is always mounted so its per-tab content cache persists across view switches */}
           <div className={viewMode === 'readme' ? 'flex flex-col flex-1 overflow-hidden' : 'hidden'}>
@@ -855,12 +1008,36 @@ export default function App() {
                 loadCategories();
               }}
               showToast={showToast}
-              onDescribeRepo={(repo) => {
-                setViewMode('library');
+              onDescribe={async (fullName) => {
+                const existing = reposRef.current.find((r) => r.id === fullName);
+                if (existing) {
+                  describeRepo(existing);
+                  return { wasAdded: false };
+                }
+                const repo = await invoke<Repo>('add_feed_repo_to_library', { repoFullName: fullName });
+                setRepos((rs) => (rs.some((r) => r.id === repo.id) ? rs : [repo, ...rs]));
+                loadCategories();
                 describeRepo(repo);
+                return { wasAdded: true };
+              }}
+              describing={describing}
+              viewVariant={viewVariant}
+              onVariantChange={setViewVariant}
+              onSelectionChange={(repo, fromClick) => {
+                setExternalSelectedRepo(repo);
+                if (fromClick) setDetailOpen(true);
               }}
             />
-          ) : viewMode === 'graph' ? null : viewMode === 'readme' ? null : viewMode === 'watching' ? (
+          ) : viewMode === 'graph' ? null : viewMode === 'readme' ? null : viewMode === 'settings' ? (
+            <SettingsView
+              onBack={() => {
+                setViewMode('library');
+                invoke<{ pat_set: boolean }>('get_settings')
+                  .then((s) => setPatMissing(!s.pat_set))
+                  .catch(() => {});
+              }}
+            />
+          ) : viewMode === 'watching' ? (
             <WatchingView
               onBack={() => setViewMode('library')}
               showToast={showToast}
@@ -878,6 +1055,12 @@ export default function App() {
                 });
                 loadCategories();
               }}
+              viewVariant={viewVariant}
+              onVariantChange={setViewVariant}
+              onSelectionChange={(repo, fromClick) => {
+                setExternalSelectedRepo(repo);
+                if (fromClick) setDetailOpen(true);
+              }}
             />
           ) : (
             <>
@@ -887,58 +1070,103 @@ export default function App() {
                 searchRef={searchRef}
                 aiStatus={aiStatus}
                 onAiStatusChange={setAiStatus}
+                trailing={<VariantToggle value={viewVariant} onChange={setViewVariant} />}
               />
 
-              <div ref={listRef} className="flex-1 overflow-y-auto">
-                {repos.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-sm text-muted">
-                    {query ? 'No repos match your search.' : 'Your library is empty.'}
-                  </div>
-                ) : (
-                  <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-                    {rowVirtualizer.getVirtualItems().map((vItem) => {
-                      const repo = repos[vItem.index];
-                      return (
-                        <div
-                          key={repo.id}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            transform: `translateY(${vItem.start}px)`,
-                          }}
-                        >
-                          <RepoRow
-                            repo={repo}
-                            isSelected={vItem.index === selectedIdx}
-                            currentPromptVersion={constants.current_prompt_version}
-                            onClick={() => {
-                              setSelectedIdx(vItem.index);
-                              setEditingId(null);
-                            }}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              {describing.size > 0 && (
+                <div
+                  className="eunha-progress-bar"
+                  role="progressbar"
+                  aria-label={`Describing ${describing.size} repo${describing.size !== 1 ? 's' : ''}`}
+                />
+              )}
 
-              {selectedRepo && (
-                isEditing ? (
-                  <EditPanel
-                    repo={selectedRepo}
-                    onSave={handleEditSave}
-                    onDiscard={() => setEditingId(null)}
-                  />
-                ) : (
-                  <DetailPanel
-                    repo={selectedRepo}
-                    isDescribing={isDescribing}
-                    currentPromptVersion={constants.current_prompt_version}
-                  />
-                )
+              {viewVariant === 'masonry' ? (
+                <div ref={masonryScrollRef} className="flex-1 overflow-y-auto px-3.5 pt-3.5 pb-1">
+                  {repos.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-sm text-muted">
+                      {query ? 'No repos match your search.' : 'Your library is empty.'}
+                    </div>
+                  ) : (
+                    <div className="eunha-masonry-grid">
+                      {repos.map((repo, i) => (
+                        <RepoCardMasonry
+                          key={repo.id}
+                          repo={repo}
+                          index={i}
+                          isSelected={i === selectedIdx}
+                          isDescribing={describing.has(repo.id)}
+                          currentPromptVersion={constants.current_prompt_version}
+                          onClick={() => {
+                            setSelectedIdx(i);
+                            setEditingId(null);
+                            setDetailOpen(true);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div ref={listRef} className="flex-1 overflow-y-auto">
+                  {repos.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-sm text-muted">
+                      {query ? 'No repos match your search.' : 'Your library is empty.'}
+                    </div>
+                  ) : (
+                    <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+                      {rowVirtualizer.getVirtualItems().map((vItem) => {
+                        const repo = repos[vItem.index];
+                        return (
+                          <div
+                            key={repo.id}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              transform: `translateY(${vItem.start}px)`,
+                            }}
+                          >
+                            {viewVariant === 'dense' ? (
+                              <RepoRowDense
+                                repo={repo}
+                                isSelected={vItem.index === selectedIdx}
+                                isDescribing={describing.has(repo.id)}
+                                currentPromptVersion={constants.current_prompt_version}
+                                onClick={() => {
+                                  setSelectedIdx(vItem.index);
+                                  setEditingId(null);
+                                  setDetailOpen(true);
+                                }}
+                              />
+                            ) : (
+                              <RepoRowComfy
+                                repo={repo}
+                                isSelected={vItem.index === selectedIdx}
+                                isDescribing={describing.has(repo.id)}
+                                currentPromptVersion={constants.current_prompt_version}
+                                onClick={() => {
+                                  setSelectedIdx(vItem.index);
+                                  setEditingId(null);
+                                  setDetailOpen(true);
+                                }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedRepo && isEditing && (
+                <EditPanel
+                  repo={selectedRepo}
+                  onSave={handleEditSave}
+                  onDiscard={() => setEditingId(null)}
+                />
               )}
 
               {/* Status bar */}
@@ -967,7 +1195,14 @@ export default function App() {
               }`}
             >
               {splitPane.view === 'graph' ? (
-                <GraphView showToast={showToast} theme={theme} />
+                <GraphView
+              showToast={showToast}
+              theme={theme}
+              onSelectionChange={(repo, fromClick) => {
+                setExternalSelectedRepo(repo);
+                if (fromClick) setDetailOpen(true);
+              }}
+            />
               ) : splitPane.view === 'readme' ? (
                 <ReadmeView
                   tabs={readmeTabs}
@@ -985,11 +1220,24 @@ export default function App() {
                     loadCategories();
                   }}
                   showToast={showToast}
-                  onDescribeRepo={(repo) => {
-                    setSplitPane(null);
-                    setFocusedSide('left');
-                    setViewMode('library');
+                  onDescribe={async (fullName) => {
+                    const existing = reposRef.current.find((r) => r.id === fullName);
+                    if (existing) {
+                      describeRepo(existing);
+                      return { wasAdded: false };
+                    }
+                    const repo = await invoke<Repo>('add_feed_repo_to_library', { repoFullName: fullName });
+                    setRepos((rs) => (rs.some((r) => r.id === repo.id) ? rs : [repo, ...rs]));
+                    loadCategories();
                     describeRepo(repo);
+                    return { wasAdded: true };
+                  }}
+                  describing={describing}
+                  viewVariant={viewVariant}
+                  onVariantChange={setViewVariant}
+                  onSelectionChange={(repo, fromClick) => {
+                    setExternalSelectedRepo(repo);
+                    if (fromClick) setDetailOpen(true);
                   }}
                 />
               ) : splitPane.view === 'watching' ? (
@@ -1010,6 +1258,12 @@ export default function App() {
                     });
                     loadCategories();
                   }}
+                  viewVariant={viewVariant}
+                  onVariantChange={setViewVariant}
+                  onSelectionChange={(repo, fromClick) => {
+                    setExternalSelectedRepo(repo);
+                    if (fromClick) setDetailOpen(true);
+                  }}
                 />
               ) : (
                 <div className="flex flex-1 items-center justify-center text-sm text-muted px-6 text-center">
@@ -1019,18 +1273,20 @@ export default function App() {
             </div>
           </>
         )}
+
+        {detailOpen && focusedView !== 'settings' && (
+          <RepoDetailSidebar
+            repo={sidebarRepo}
+            isDescribing={sidebarIsDescribing}
+            currentPromptVersion={constants.current_prompt_version}
+            onOpenUrl={() => sidebarRepo && openUrl(sidebarRepo.url)}
+            onClose={() => setDetailOpen(false)}
+          />
+        )}
       </div>
         </div>
       </main>
 
-      {modal === 'settings' && (
-        <SettingsModal onClose={() => {
-          setModal(null);
-          invoke<{ pat_set: boolean }>('get_settings')
-            .then((s) => setPatMissing(!s.pat_set))
-            .catch(() => {});
-        }} />
-      )}
       {modal === 'import' && (
         <ImportModal
           onClose={() => setModal(null)}
@@ -1050,6 +1306,28 @@ export default function App() {
       )}
       {modal === 'help' && (
         <KeybindingHelp onClose={() => setModal(null)} />
+      )}
+      {digest && (
+        <DigestCard
+          batch={digest}
+          describing={describing}
+          onClose={() => setDigest(null)}
+          onOpen={(repo) => openUrl(repo.url)}
+          onDescribe={describeRepoReturning}
+          onEdit={(repo) => {
+            setDigest(null);
+            const idx = repos.findIndex((r) => r.id === repo.id);
+            if (idx >= 0) setSelectedIdx(idx);
+            setEditingId(repo.id);
+          }}
+          onAction={(repoId, action) => {
+            invoke('record_digest_action', {
+              repoId,
+              batchDate: digest.batch_date,
+              action,
+            }).catch(() => {});
+          }}
+        />
       )}
     </div>
   );
