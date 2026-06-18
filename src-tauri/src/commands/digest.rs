@@ -1,8 +1,10 @@
 use crate::commands::describe::repo_from_row;
 use crate::db::DbState;
 use crate::models::{DigestBatch, DigestItem, Repo};
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
+use std::time::Duration;
 use tauri::State;
 
 // ── Tuning constants ──────────────────────────────────────────────────────────
@@ -250,6 +252,122 @@ pub fn record_digest_action(
 ) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     apply_digest_action(&conn, &repo_id, &batch_date, &action).map_err(|e| e.to_string())
+}
+
+#[derive(serde::Deserialize)]
+struct GhLatestRelease {
+    tag_name: String,
+    published_at: String,
+    #[serde(default)]
+    prerelease: bool,
+}
+
+/// Fetch the latest release for each candidate. Best-effort: network/parse errors are skipped.
+/// Returns (repo_id, tag_name, published_at, prerelease) for candidates that have a latest release.
+async fn fetch_latest_releases(candidate_ids: &[String], pat: &str) -> Vec<(String, String, String, bool)> {
+    let mut headers = HeaderMap::new();
+    headers.insert(USER_AGENT, HeaderValue::from_static("eunha"));
+    let client = match reqwest::Client::builder()
+        .default_headers(headers)
+        .timeout(Duration::from_secs(10))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+
+    let mut out: Vec<(String, String, String, bool)> = vec![];
+    for chunk in candidate_ids.chunks(5) {
+        let futures: Vec<_> = chunk
+            .iter()
+            .map(|id| {
+                let client = client.clone();
+                let pat = pat.to_owned();
+                let id = id.clone();
+                async move {
+                    let url = format!("https://api.github.com/repos/{}/releases/latest", id);
+                    let mut req = client.get(&url);
+                    if !pat.is_empty() {
+                        req = req.header(AUTHORIZATION, format!("Bearer {}", pat));
+                    }
+                    let resp = req.send().await.ok()?;
+                    if !resp.status().is_success() {
+                        return None;
+                    }
+                    let r: GhLatestRelease = resp.json().await.ok()?;
+                    Some((id, r.tag_name, r.published_at, r.prerelease))
+                }
+            })
+            .collect();
+        for res in futures::future::join_all(futures).await {
+            if let Some(t) = res {
+                out.push(t);
+            }
+        }
+    }
+    out
+}
+
+pub async fn generate_batch(
+    state: &State<'_, DbState>,
+    weights: Weights,
+) -> Result<Option<DigestBatch>, String> {
+    // Phase 1 — candidates (short locked scope).
+    let candidates = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        select_candidates(&conn, &weights, CANDIDATE_POOL).map_err(|e| e.to_string())?
+    };
+    if candidates.len() < 3 {
+        return Ok(None); // thin guard — no sad card
+    }
+
+    // Phase 2 — lazy release fetch (no lock held across await).
+    let pat = crate::commands::settings::get_secret("github_pat").unwrap_or_default();
+    let candidate_ids: Vec<String> = candidates.iter().map(|c| c.repo.id.clone()).collect();
+    let raw_releases = fetch_latest_releases(&candidate_ids, &pat).await;
+
+    // Compute recency via SQLite (no chrono), build the release map, rank, persist.
+    let batch = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let mut releases: HashMap<String, ReleaseInfo> = HashMap::new();
+        for (id, tag, published_at, prerelease) in raw_releases {
+            let recent = !prerelease && recency_within(&conn, &published_at, RELEASE_WINDOW_DAYS);
+            releases.insert(id, ReleaseInfo { tag_name: tag, recent });
+        }
+        let selected = rank_final(candidates, &releases, &weights);
+        if selected.is_empty() {
+            return Ok(None);
+        }
+        let batch_date = persist_batch(&conn, &selected).map_err(|e| e.to_string())?;
+        DigestBatch {
+            batch_date,
+            items: selected
+                .into_iter()
+                .map(|s| DigestItem { repo: s.repo, reason: s.reason, reason_detail: s.reason_detail, action: None })
+                .collect(),
+        }
+    };
+    Ok(Some(batch))
+}
+
+#[tauri::command]
+pub async fn get_launch_digest(state: State<'_, DbState>) -> Result<Option<DigestBatch>, String> {
+    // Idempotent within a day + due check (short locked scope).
+    let (has_today, due) = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let has_today: i64 = conn
+            .query_row("SELECT COUNT(*) FROM digest_items WHERE batch_date = date('now')", [], |r| r.get(0))
+            .map_err(|e| e.to_string())?;
+        (has_today > 0, is_due(&conn))
+    };
+    if has_today {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        return Ok(read_current_batch(&conn));
+    }
+    if !due {
+        return Ok(None);
+    }
+    generate_batch(&state, Weights::default()).await
 }
 
 #[cfg(test)]

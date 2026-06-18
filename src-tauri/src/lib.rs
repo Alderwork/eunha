@@ -81,6 +81,7 @@ pub fn run() {
             commands::onboarding::save_pat,
             commands::digest::get_current_digest,
             commands::digest::record_digest_action,
+            commands::digest::get_launch_digest,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
