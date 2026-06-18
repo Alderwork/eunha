@@ -254,4 +254,22 @@ mod tests {
         assert_eq!(assign_reason(&repo("a/o", true, None), 12, None).0, "forgotten");
         assert_eq!(assign_reason(&repo("a/n", true, None), 1, None).0, "serendipity");
     }
+
+    #[test]
+    fn rank_diversity_does_not_cap_null_category() {
+        let cands = vec![
+            Candidate { repo: repo("a/1", true, None), base_score: 3.0, forgotten_months: 1 },
+            Candidate { repo: repo("a/2", true, None), base_score: 2.0, forgotten_months: 1 },
+            Candidate { repo: repo("a/3", true, None), base_score: 1.0, forgotten_months: 1 },
+        ];
+        let out = rank_final(cands, &HashMap::new(), &Weights::default());
+        assert_eq!(out.len(), 3, "null-category repos must not be capped");
+    }
+
+    #[test]
+    fn assign_reason_forgotten_detail_is_month_count() {
+        let (reason, detail) = assign_reason(&repo("a/o", true, None), 12, None);
+        assert_eq!(reason, "forgotten");
+        assert_eq!(detail, "12");
+    }
 }
