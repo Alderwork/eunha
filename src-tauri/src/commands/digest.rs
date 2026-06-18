@@ -336,18 +336,19 @@ pub async fn generate_batch(
         }
         let selected = rank_final(candidates, &releases, &weights);
         if selected.is_empty() {
-            return Ok(None);
-        }
-        let batch_date = persist_batch(&conn, &selected).map_err(|e| e.to_string())?;
-        DigestBatch {
-            batch_date,
-            items: selected
-                .into_iter()
-                .map(|s| DigestItem { repo: s.repo, reason: s.reason, reason_detail: s.reason_detail, action: None })
-                .collect(),
+            None
+        } else {
+            let batch_date = persist_batch(&conn, &selected).map_err(|e| e.to_string())?;
+            Some(DigestBatch {
+                batch_date,
+                items: selected
+                    .into_iter()
+                    .map(|s| DigestItem { repo: s.repo, reason: s.reason, reason_detail: s.reason_detail, action: None })
+                    .collect(),
+            })
         }
     };
-    Ok(Some(batch))
+    Ok(batch)
 }
 
 #[tauri::command]
