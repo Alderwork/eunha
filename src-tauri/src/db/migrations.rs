@@ -455,5 +455,14 @@ mod tests {
             )
             .unwrap();
         assert_eq!(idx, 1, "idx_digest_batch should exist");
+
+        let idx2: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_digest_repo'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(idx2, 1, "idx_digest_repo should exist");
     }
 }
