@@ -109,3 +109,15 @@ export interface FeedFetchResult {
   cancelled: boolean;
   error: string | null;
 }
+
+export interface DigestItem {
+  repo: Repo;
+  reason: 'release' | 'undescribed' | 'forgotten' | 'serendipity';
+  reason_detail: string;
+  action: string | null;
+}
+
+export interface DigestBatch {
+  batch_date: string;
+  items: DigestItem[];
+}
