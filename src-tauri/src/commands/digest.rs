@@ -205,8 +205,8 @@ pub fn read_current_batch(conn: &Connection) -> Option<DigestBatch> {
             Ok(DigestItem { repo, reason, reason_detail: reason_detail.unwrap_or_default(), action })
         })
         .ok()?
-        .filter_map(|r| r.ok())
-        .collect();
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .ok()?;
 
     if items.is_empty() {
         None
@@ -221,6 +221,26 @@ pub fn get_current_digest(state: State<'_, DbState>) -> Result<Option<DigestBatc
     Ok(read_current_batch(&conn))
 }
 
+fn apply_digest_action(
+    conn: &Connection,
+    repo_id: &str,
+    batch_date: &str,
+    action: &str,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE digest_items SET action = ?1, action_at = datetime('now')
+         WHERE repo_id = ?2 AND batch_date = ?3",
+        params![action, repo_id, batch_date],
+    )?;
+    if action == "archived" {
+        conn.execute(
+            "UPDATE repos SET resurface_archived = 1 WHERE id = ?1",
+            params![repo_id],
+        )?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn record_digest_action(
     repo_id: String,
@@ -229,20 +249,7 @@ pub fn record_digest_action(
     state: State<'_, DbState>,
 ) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.execute(
-        "UPDATE digest_items SET action = ?1, action_at = datetime('now')
-         WHERE repo_id = ?2 AND batch_date = ?3",
-        params![action, repo_id, batch_date],
-    )
-    .map_err(|e| e.to_string())?;
-    if action == "archived" {
-        conn.execute(
-            "UPDATE repos SET resurface_archived = 1 WHERE id = ?1",
-            params![repo_id],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    apply_digest_action(&conn, &repo_id, &batch_date, &action).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -401,6 +408,17 @@ mod tests {
     }
 
     #[test]
+    fn is_due_true_at_exact_interval() {
+        let conn = db();
+        insert_repo(&conn, "a/r", true, 400);
+        conn.execute(
+            "INSERT INTO digest_items (repo_id, batch_date, reason) VALUES ('a/r', date('now','-7 days'), 'forgotten')",
+            [],
+        ).unwrap();
+        assert!(is_due(&conn), "exactly 7 days should be due (>= boundary)");
+    }
+
+    #[test]
     fn persist_and_read_current_batch() {
         let conn = db();
         insert_repo(&conn, "a/r", true, 400);
@@ -439,9 +457,7 @@ mod tests {
         let bd = persist_batch(&conn, &[SelectedItem {
             repo: repo("a/r", true, None), reason: "forgotten".into(), reason_detail: "13".into(), score: 1.0,
         }]).unwrap();
-        // inline the command body via direct SQL the command runs:
-        conn.execute("UPDATE digest_items SET action='archived', action_at=datetime('now') WHERE repo_id='a/r' AND batch_date=?1", params![bd]).unwrap();
-        conn.execute("UPDATE repos SET resurface_archived=1 WHERE id='a/r'", []).unwrap();
+        apply_digest_action(&conn, "a/r", &bd, "archived").unwrap();
         let archived: i64 = conn.query_row("SELECT resurface_archived FROM repos WHERE id='a/r'", [], |r| r.get(0)).unwrap();
         assert_eq!(archived, 1);
         // and an archived repo is no longer eligible
