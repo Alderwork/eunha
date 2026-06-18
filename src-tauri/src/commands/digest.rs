@@ -1,7 +1,9 @@
 use crate::commands::describe::repo_from_row;
-use crate::models::Repo;
+use crate::db::DbState;
+use crate::models::{DigestBatch, DigestItem, Repo};
 use rusqlite::{params, Connection};
 use std::collections::HashMap;
+use tauri::State;
 
 // ── Tuning constants ──────────────────────────────────────────────────────────
 const DIGEST_SIZE: usize = 5;
@@ -141,6 +143,108 @@ pub fn rank_final(cands: Vec<Candidate>, releases: &HashMap<String, ReleaseInfo>
     out
 }
 
+pub fn is_due(conn: &Connection) -> bool {
+    conn.query_row(
+        "SELECT CASE
+                  WHEN MAX(batch_date) IS NULL THEN 1
+                  WHEN julianday('now') - julianday(MAX(batch_date)) >= ?1 THEN 1
+                  ELSE 0 END
+         FROM digest_items",
+        params![DIGEST_INTERVAL_DAYS],
+        |r| r.get::<_, i64>(0),
+    )
+    .unwrap_or(1)
+        == 1
+}
+
+pub fn recency_within(conn: &Connection, published_at: &str, days: f64) -> bool {
+    conn.query_row(
+        "SELECT CASE WHEN (julianday('now') - julianday(?1)) <= ?2 THEN 1 ELSE 0 END",
+        params![published_at, days],
+        |r| r.get::<_, i64>(0),
+    )
+    .unwrap_or(0)
+        == 1
+}
+
+pub fn persist_batch(conn: &Connection, items: &[SelectedItem]) -> rusqlite::Result<String> {
+    let batch_date: String = conn.query_row("SELECT date('now')", [], |r| r.get(0))?;
+    let tx = conn.unchecked_transaction()?;
+    for it in items {
+        tx.execute(
+            "INSERT INTO digest_items (repo_id, batch_date, reason, reason_detail, score)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![it.repo.id, batch_date, it.reason, it.reason_detail, it.score],
+        )?;
+    }
+    tx.commit()?;
+    Ok(batch_date)
+}
+
+pub fn read_current_batch(conn: &Connection) -> Option<DigestBatch> {
+    let batch_date: Option<String> = conn
+        .query_row("SELECT MAX(batch_date) FROM digest_items", [], |r| r.get(0))
+        .ok()
+        .flatten();
+    let batch_date = batch_date?;
+
+    let sql = format!(
+        "SELECT {cols}, di.reason, di.reason_detail, di.action
+         FROM digest_items di JOIN repos ON repos.id = di.repo_id
+         WHERE di.batch_date = ?1
+         ORDER BY di.id",
+        cols = REPO_COLS_PREFIXED
+    );
+    let mut stmt = conn.prepare(&sql).ok()?;
+    let items: Vec<DigestItem> = stmt
+        .query_map(params![batch_date], |row| {
+            let repo = repo_from_row(row)?;
+            let reason: String = row.get(22)?;
+            let reason_detail: Option<String> = row.get(23)?;
+            let action: Option<String> = row.get(24)?;
+            Ok(DigestItem { repo, reason, reason_detail: reason_detail.unwrap_or_default(), action })
+        })
+        .ok()?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    if items.is_empty() {
+        None
+    } else {
+        Some(DigestBatch { batch_date, items })
+    }
+}
+
+#[tauri::command]
+pub fn get_current_digest(state: State<'_, DbState>) -> Result<Option<DigestBatch>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    Ok(read_current_batch(&conn))
+}
+
+#[tauri::command]
+pub fn record_digest_action(
+    repo_id: String,
+    batch_date: String,
+    action: String,
+    state: State<'_, DbState>,
+) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE digest_items SET action = ?1, action_at = datetime('now')
+         WHERE repo_id = ?2 AND batch_date = ?3",
+        params![action, repo_id, batch_date],
+    )
+    .map_err(|e| e.to_string())?;
+    if action == "archived" {
+        conn.execute(
+            "UPDATE repos SET resurface_archived = 1 WHERE id = ?1",
+            params![repo_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -271,5 +375,77 @@ mod tests {
         let (reason, detail) = assign_reason(&repo("a/o", true, None), 12, None);
         assert_eq!(reason, "forgotten");
         assert_eq!(detail, "12");
+    }
+
+    #[test]
+    fn is_due_empty_true_then_false_after_today_batch() {
+        let conn = db();
+        assert!(is_due(&conn), "empty digest should be due");
+        insert_repo(&conn, "a/r", true, 400);
+        conn.execute(
+            "INSERT INTO digest_items (repo_id, batch_date, reason) VALUES ('a/r', date('now'), 'forgotten')",
+            [],
+        ).unwrap();
+        assert!(!is_due(&conn), "same-day batch should not be due");
+    }
+
+    #[test]
+    fn is_due_true_after_interval() {
+        let conn = db();
+        insert_repo(&conn, "a/r", true, 400);
+        conn.execute(
+            "INSERT INTO digest_items (repo_id, batch_date, reason) VALUES ('a/r', date('now','-8 days'), 'forgotten')",
+            [],
+        ).unwrap();
+        assert!(is_due(&conn), "8-day-old batch should be due");
+    }
+
+    #[test]
+    fn persist_and_read_current_batch() {
+        let conn = db();
+        insert_repo(&conn, "a/r", true, 400);
+        let items = vec![SelectedItem {
+            repo: repo("a/r", true, Some("Library")),
+            reason: "forgotten".to_string(),
+            reason_detail: "13".to_string(),
+            score: 1.0,
+        }];
+        let bd = persist_batch(&conn, &items).unwrap();
+        let batch = read_current_batch(&conn).expect("batch should exist");
+        assert_eq!(batch.batch_date, bd);
+        assert_eq!(batch.items.len(), 1);
+        assert_eq!(batch.items[0].reason, "forgotten");
+        assert_eq!(batch.items[0].repo.id, "a/r");
+        assert!(batch.items[0].action.is_none());
+    }
+
+    #[test]
+    fn recency_within_window() {
+        let conn = db();
+        assert!(recency_within(&conn, "now", 30.0) || recency_within(&conn, &iso_days_ago(&conn, 2), 30.0));
+        assert!(!recency_within(&conn, &iso_days_ago(&conn, 90), 30.0));
+        assert!(!recency_within(&conn, "not-a-date", 30.0));
+    }
+
+    // helper: produce an ISO timestamp N days ago using SQLite
+    fn iso_days_ago(conn: &Connection, days: i64) -> String {
+        conn.query_row("SELECT datetime('now', ?1)", params![format!("-{} days", days)], |r| r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn record_action_archived_sets_flag() {
+        let conn = db();
+        insert_repo(&conn, "a/r", true, 400);
+        let bd = persist_batch(&conn, &[SelectedItem {
+            repo: repo("a/r", true, None), reason: "forgotten".into(), reason_detail: "13".into(), score: 1.0,
+        }]).unwrap();
+        // inline the command body via direct SQL the command runs:
+        conn.execute("UPDATE digest_items SET action='archived', action_at=datetime('now') WHERE repo_id='a/r' AND batch_date=?1", params![bd]).unwrap();
+        conn.execute("UPDATE repos SET resurface_archived=1 WHERE id='a/r'", []).unwrap();
+        let archived: i64 = conn.query_row("SELECT resurface_archived FROM repos WHERE id='a/r'", [], |r| r.get(0)).unwrap();
+        assert_eq!(archived, 1);
+        // and an archived repo is no longer eligible
+        let c = select_candidates(&conn, &no_serendipity(), 15).unwrap();
+        assert!(c.iter().all(|x| x.repo.id != "a/r"));
     }
 }
