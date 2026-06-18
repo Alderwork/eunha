@@ -63,7 +63,7 @@ pub fn select_candidates(conn: &Connection, w: &Weights, pool: usize) -> rusqlit
         "SELECT {cols},
             ( ?1 * MIN(1.0, (julianday('now') - COALESCE(julianday(repos.added_at), julianday('now'))) / 365.0)
             + ?2 * (repos.llm_summary IS NULL)
-            + ?3 * (ABS(RANDOM()) % 1000) / 1000.0
+            + ?3 * ABS(RANDOM() % 1000) / 1000.0
             - ?4 * COALESCE(d.surfaced_count, 0)
             ) AS base_score,
             CAST((julianday('now') - COALESCE(julianday(repos.added_at), julianday('now'))) / 30.0 AS INTEGER) AS forgotten_months

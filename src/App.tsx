@@ -500,6 +500,13 @@ export default function App() {
           return;
         }
 
+        // Re-open digest (shift-R). Works from any view.
+        if (e.key === 'R' && !editingId) {
+          e.preventDefault();
+          openDigest();
+          return;
+        }
+
         // Toggle the right repo-detail sidebar (i). Works from any view.
         if (e.key === 'i' && !editingId) {
           e.preventDefault();
@@ -687,9 +694,7 @@ export default function App() {
           case ',':
             setFocusedView('settings');
             break;
-          case 'R':
-            if (!editingId) openDigest();
-            break;
+          // shift-R is handled globally above (before the non-library early-return guard)
           case '?':
             setModal('help');
             break;
@@ -1317,8 +1322,12 @@ export default function App() {
           onEdit={(repo) => {
             setDigest(null);
             const idx = repos.findIndex((r) => r.id === repo.id);
-            if (idx >= 0) setSelectedIdx(idx);
-            setEditingId(repo.id);
+            if (idx >= 0) {
+              setSelectedIdx(idx);
+              setEditingId(repo.id);
+            } else {
+              showToast('목록에서 찾을 수 없는 저장소예요');
+            }
           }}
           onAction={(repoId, action) => {
             invoke('record_digest_action', {
