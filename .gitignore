@@ -6,3 +6,6 @@ src-tauri/target/
 .gstack/
 .worktrees/
 .superpowers/
+TODOS.md
+/docs/
+.vscode/
