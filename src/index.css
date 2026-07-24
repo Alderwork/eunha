@@ -101,6 +101,14 @@ html.light {
   box-sizing: border-box;
 }
 
+html {
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-ink);
