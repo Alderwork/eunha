@@ -9,3 +9,4 @@ src-tauri/target/
 TODOS.md
 /docs/
 .vscode/
+public/mock-data.json
