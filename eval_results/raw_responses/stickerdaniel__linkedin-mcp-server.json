@@ -1,0 +1,33 @@
+{
+  "id": "566985ae-1577-4dbe-9d17-c5f149917450",
+  "object": "chat.completion",
+  "created": 1782914524,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"LinkedIn MCP 서버는 AI 에이전트가 LinkedIn 데이터에 접근할 수 있게 합니다.\",\n  \"why\": \"개발자는 별도 통합 없이 LinkedIn 데이터를 AI 에이전트에 연동할 수 있습니다.\",\n  \"use_case\": \"AI 비서가 사용자를 대신해 LinkedIn 프로필이나 메시지를 검색합니다.\",\n  \"category\": \"Service\",\n  \"tags\": [\"mcp-server\", \"linkedin\", \"ai-agents\", \"python\"]\n}",
+        "reasoning_content": "We are given a GitHub repo: stickerdaniel/linkedin-mcp-server. It's an MCP server for LinkedIn, allowing AI agents to interact with LinkedIn data. Need to output JSON with fields: what, why, use_case in Korean, category and tags in English. category should be one of the listed, likely \"Service\" because it's a server. Tags from the topics: ai-agents, anthropic, chatgpt, chatgpt-desktop, claude, claude-ai, claude-code, claude-desktop, desktop-extension, dxt, linkedin, linkedin-api, linkedin-mcp, linkedin-profile-scraper, linkedin-scraper, mcp, mcp-server, model-context-protocol, python. We can pick relevant tags, but keep it concise. Also follow length constraints.\n\nWhat: This repo is an MCP server that provides LinkedIn APIs for AI agents via the Model Context Protocol.\nWhy: Developers can integrate LinkedIn data into AI agents without building custom integrations.\nUse_case: An AI assistant can search LinkedIn profiles or messages on behalf of a user.\n\nNow translate to Korean.\n\nWhat: 이 저장소는 LinkedIn API를 MCP 프로토콜로 제공하는 서버입니다.\nBut need max 80 chars. Let's count: \"이 저장소는 LinkedIn API를 MCP 프로토콜로 제공하는 서버입니다.\" length? Actually in Korean, each character counts. Let's make it concise: \"LinkedIn MCP 서버는 AI 에이전트가 LinkedIn 데이터에 접근할 수 있게 합니다.\" But that's not exactly \"what it IS\". Better: \"LinkedIn 데이터를 MCP를 통해 AI 에이전트에 제공하는 서버\" (56 chars). OK.\n\nWhy: \"개발자는 별도 통합 없이 LinkedIn 데이터를 AI 에이전트에 연동할 수 있습니다.\" (51 chars). Good.\n\nUse_case: \"AI 비서가 사용자를 대신해 LinkedIn 프로필이나 메시지를 검색합니다.\" (53 chars). OK.\n\nCategory: Service (since it's a server service). Tags: pick from list: \"mcp-server\", \"linkedin\", \"ai-agents\", \"claude\" maybe. Keep tags generic. But also \"python\" because it's Python. But the instruction says tags in English. We can include few. Possibly: \"linkedin\", \"mcp\", \"ai-agents\", \"python\". But from topics, we can select. Ensure tags are relevant.\n\nLet's check: The repo is an MCP server, so \"mcp-server\" and \"linkedin\" are core. Also \"ai-agents\" and \"model-context-protocol\". But we want concise tags. Typically 2-5 tags. I'll use: \"mcp-server\", \"linkedin\", \"ai-agents\", \"python\". But \"mcp-server\" is already in topics. Also \"linkedin-api\" could be, but maybe overlapping.\n\nI'll go with: [\"mcp-server\", \"linkedin\", \"ai-agents\", \"python\"] but check if \"mcp-server\" is appropriate. category is \"Service\", tags shouldn't repeat category. It's fine.\n\nNow output JSON. Ensure no extra text."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 535,
+    "completion_tokens": 799,
+    "total_tokens": 1334,
+    "prompt_tokens_details": {
+      "cached_tokens": 512
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 684
+    },
+    "prompt_cache_hit_tokens": 512,
+    "prompt_cache_miss_tokens": 23
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

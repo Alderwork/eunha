@@ -1,6 +1,9 @@
 @import url('https://rsms.me/inter/inter.css');
 @import "tailwindcss";
 
+/* @conduit/react components emit token-based classes; let Tailwind see them. */
+@source "../node_modules/@conduit/react";
+
 @theme {
   /* Font */
   --font-family-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;

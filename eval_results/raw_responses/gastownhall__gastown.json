@@ -1,0 +1,33 @@
+{
+  "id": "62a3b9ee-5e65-4024-91c0-6866a707e699",
+  "object": "chat.completion",
+  "created": 1782914437,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"여러 AI 개발 에이전트를 하나의 워크스페이스에서 관리하는 도구\",\n  \"why\": \"AI 에이전트 간 작업 상태를 유지하여 생산성 향상\",\n  \"use_case\": \"Claude Code와 Copilot이 같은 프로젝트에서 각자 작업하고 결과를 동기화할 때\",\n  \"category\": \"CLI Tool\",\n  \"tags\": [\"multi-agent\", \"orchestration\"]\n}",
+        "reasoning_content": "We need to generate JSON for the given repo. The repo is \"Gas Town - multi-agent workspace manager\". Language: Go. Description: \"Multi-agent orchestration system for Claude Code, GitHub Copilot, and other AI agents with persistent work tracking\". README excerpt explains it coordinates multiple AI coding agents and persists work state.\n\nWe need to write \"what\", \"why\", \"use_case\" in Korean. \"category\" and \"tags\" in English. Constraints: each field max 80 chars.\n\nLet's craft:\n\n- What: This repo is a multi-agent workspace manager for AI coding agents. In Korean: \"멀티 에이전트 AI 코딩 작업 공간 관리자\" but 80 chars limit. More precisely: \"여러 AI 코딩 에이전트를 조율하는 작업 공간 관리자\" (80 chars? Let's count: 여러 AI 코딩 에이전트를 조율하는 작업 공간 관리자 = 25 chars Korean? Actually need to check byte count? The instruction says \"max 80 chars\", likely meaning characters. We'll keep it concise. Maybe: \"AI 코딩 에이전트 다중 작업 공간 관리 시스템\" (20 chars). Better: \"여러 AI 코딩 에이전트를 위한 작업 공간 관리자\" (21). But we need one sentence. So: \"Gas Town은 Claude Code 등 여러 AI 에이전트를 조율하고 작업 상태를 저장하는 워크스페이스 관리자입니다.\" But that might be too long. Shorten: \"여러 AI 코딩 에이전트를 조율하고 작업 상태를 유지하는 워크스페이스 관리자\" (25 chars? Actually 한글 한 글자는 2바이트? But chars count as characters. Should be fine. However we need exactly one sentence max 80 chars. I'll make it concise: \"멀티 AI 에이전트 워크스페이스 관리 도구\" (13 chars) but need to be descriptive. Let's see description: \"Multi-agent orchestration system for AI coding agents with persistent work tracking\". So in Korean: \"AI 코딩 에이전트를 위한 다중 에이전트 오케스트레이션 및 작업 추적 시스템\" (too long). Use: \"여러 AI 개발 에이전트를 하나의 워크스페이스에서 관리하는 도구\" (19 chars). That's good.\n\n- Why: Why developer would care? Because it enables seamless collaboration between agents like Claude Code and Copilot with persistent context. In Korean: \"에이전트 간 작업 상태를 유지하며 협업할 수 있어 생산성이 향상됩니다\" (too long). Short: \"작업 중단 없이 AI 에이전트들이 컨텍스트를 유지하며 협업 가능\" (20 chars). Or: \"AI 에이전트 간 작업 상태를 유지하여 생산성 향상\" (17 chars). Good.\n\n- Use case: Specific scenario: e.g., \"여러 AI 에이전트가 동시에 다른 기능을 개발하며 작업 기록을 유지해야 할 때 사용\" (24 chars). Or: \"Claude Code와 Copilot이 같은 프로젝트에서 각자 작업하고 결과를 동기화할 때\" (22 chars). That's good.\n\nNow category: It's a CLI tool? It's a workspace manager, likely CLI. The README mentions it's a \"workspace manager\". Could be \"CLI Tool\" or \"Service\"? But it's a Go tool. I'd say \"CLI Tool\" since it's used from command line. Also \"Framework\"? Not exactly. \"Library\"? No. \"Other\"? Possibly. But I think \"CLI Tool\" fits.\n\nTags: In English. Possible tags: \"multi-agent\", \"orchestration\", \"AI\", \"coding\", \"workspace\", \"go\", \"claude\", \"copilot\". But we need two tags? The format shows [\"tag1\", \"tag2\"] but could be more? Probably two or three. Let's pick: \"multi-agent\", \"orchestration\". Or \"AI\", \"workspace-manager\". I'll go with \"multi-agent\" and \"orchestration\".\n\nNow output JSON.\n\nEnsure all fields are strings. Tags array of strings.\n\nLet's write final JSON."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 374,
+    "completion_tokens": 1035,
+    "total_tokens": 1409,
+    "prompt_tokens_details": {
+      "cached_tokens": 256
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 928
+    },
+    "prompt_cache_hit_tokens": 256,
+    "prompt_cache_miss_tokens": 118
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

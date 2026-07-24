@@ -1,5 +1,8 @@
-import { Repo } from '../types';
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { Repo, Collection, SimilarRepo, ContributionData } from '../types';
 import { Kbd } from './ui/Kbd';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 interface Props {
   repo: Repo | null;
@@ -94,6 +97,28 @@ function RepoBody({
   currentPromptVersion: number;
   onOpenUrl: () => void;
 }) {
+  const [repoCollections, setRepoCollections] = useState<Collection[]>([]);
+  const [similarRepos, setSimilarRepos] = useState<SimilarRepo[]>([]);
+  const [contribution, setContribution] = useState<ContributionData | null>(null);
+
+  useEffect(() => {
+    invoke<Collection[]>('get_repo_collections', { repoId: repo.id })
+      .then(setRepoCollections)
+      .catch(() => {});
+  }, [repo.id]);
+
+  useEffect(() => {
+    invoke<SimilarRepo[]>('get_similar_repos', { repoId: repo.id, limit: 5 })
+      .then(setSimilarRepos)
+      .catch(() => {});
+  }, [repo.id]);
+
+  useEffect(() => {
+    invoke<ContributionData>('get_contribution_data', { repoId: repo.id })
+      .then(setContribution)
+      .catch(() => {});
+  }, [repo.id]);
+
   const topics = parseJsonArray(repo.topics);
   const llmTags = parseJsonArray(repo.llm_tags);
   const isStale =
@@ -241,13 +266,88 @@ function RepoBody({
         </div>
       )}
 
+      {repoCollections.length > 0 && (
+        <div className="px-4 py-3 border-b border-border">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-faint mb-1.5">Collections</div>
+          <div className="flex flex-wrap gap-1">
+            {repoCollections.map((c) => (
+              <span
+                key={c.id}
+                className="text-[10px] px-1.5 py-0.5 rounded-[2px] bg-surface text-dim flex items-center gap-1"
+              >
+                {c.icon && <span>{c.icon}</span>}
+                {c.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {contribution && (
+        <div className="px-4 py-3 border-b border-border">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-faint mb-2">Contribute</div>
+          <div className="space-y-1.5">
+            {contribution.good_first_issue_count > 0 && (
+              <button
+                onClick={() => openUrl(`${contribution.github_url}/issues?q=label%3A%22good+first+issue%22+is%3Aopen`)}
+                className="block w-full text-left text-xs text-dim hover:text-accent transition-colors"
+              >
+                {contribution.good_first_issue_count} good first issue{contribution.good_first_issue_count > 1 ? 's' : ''}
+              </button>
+            )}
+            {contribution.open_pr_count > 0 && (
+              <button
+                onClick={() => openUrl(`${contribution.github_url}/pulls`)}
+                className="block w-full text-left text-xs text-dim hover:text-accent transition-colors"
+              >
+                {contribution.open_pr_count} open PR{contribution.open_pr_count > 1 ? 's' : ''}
+              </button>
+            )}
+            {contribution.has_contributing_md && (
+              <button
+                onClick={() => openUrl(`${contribution.github_url}/blob/main/CONTRIBUTING.md`)}
+                className="block w-full text-left text-xs text-dim hover:text-accent transition-colors"
+              >
+                View contributing guide
+              </button>
+            )}
+            <button
+              onClick={() => openUrl(`${contribution.github_url}/issues`)}
+              className="block w-full text-left text-xs text-dim hover:text-accent transition-colors"
+            >
+              Open issues
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted">
         <span className="flex items-center gap-1"><Kbd>d</Kbd> describe</span>
         <span className="flex items-center gap-1"><Kbd>r</Kbd> readme</span>
         <span className="flex items-center gap-1"><Kbd>w</Kbd> {repo.watching ? 'unwatch' : 'watch'}</span>
+        <span className="flex items-center gap-1"><Kbd>m</Kbd> read later</span>
         <span className="flex items-center gap-1"><Kbd>o</Kbd> open</span>
         <span className="flex items-center gap-1"><Kbd>i</Kbd> close</span>
       </div>
+
+      {similarRepos.length > 0 && (
+        <div className="border-t border-border px-4 py-3">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-faint mb-2">Similar repos</div>
+          <div className="space-y-2">
+            {similarRepos.map((sr) => (
+              <button
+                key={sr.repo.id}
+                onClick={() => openUrl(sr.repo.url)}
+                className="block w-full text-left text-xs text-dim hover:text-accent truncate transition-colors"
+                title={sr.repo.full_name}
+              >
+                <span className="font-medium">{sr.repo.full_name}</span>
+                <span className="text-faint ml-1">· {sr.repo.llm_what}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,33 @@
+{
+  "id": "c922da2e-23ab-4753-b410-b5865bee06de",
+  "object": "chat.completion",
+  "created": 1782914490,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"옵시디언에서 관련 노트를 찾고 연결해주는 플러그인\",\n  \"why\": \"로컬 임베딩 모델로 별도 설정 없이 의미 기반 검색을 제공합니다\",\n  \"use_case\": \"글 작성 중 관련 노트를 실시간으로 추천하여 연결해줍니다\",\n  \"category\": \"Other\",\n  \"tags\": [\"obsidian-plugin\", \"semantic-search\", \"embeddings\"]\n}",
+        "reasoning_content": "We are given a GitHub repo: brianpetro/obsidian-smart-connections. The description says it's an Obsidian plugin that finds related notes and excerpts while writing, using a local embedding model for semantic search. It's written in JavaScript.\n\nWe need to produce JSON with \"what\", \"why\", \"use_case\" in Korean, and \"category\" and \"tags\" in English.\n\nFirst, let's craft the \"what\" in one sentence (max 80 chars) in Korean: What this repo is. It is an Obsidian plugin for smart connections and semantic search. Something like: \"옵시디언에서 관련 노트를 찾고 연결해주는 플러그인\" (Obsidian plugin that finds and connects related notes). But keep it concise.\n\n\"why\": Why a developer would care. It offers zero-setup semantic search with local embeddings, no API key needed. Developers might care because it's a useful feature for note-taking. E.g., \"로컬 임베딩 모델로 별도 설정 없이 의미 기반 검색을 제공합니다\" (Provides zero-setup semantic search with local embedding model).\n\n\"use_case\": Specific scenario. E.g., \"글을 쓰는 중에 관련 노트를 실시간으로 추천하여 연결해줍니다\" (Recommends related notes in real-time while writing).\n\n\"category\": It's a plugin for Obsidian, so it's a \"Plugin\" but the options are: CLI Tool, Library, Framework, Service, Learning Resource, Template, Other. Since it's an Obsidian plugin, it's not exactly a library, framework, etc. \"Other\" might fit, but maybe \"Library\" because it's a plugin that extends Obsidian? Actually, Obsidian plugins are typically considered \"Plugins\" but our category list doesn't include that. The closest might be \"Other\". But let's see if there is a better fit. It's not a CLI tool, not a library (though it might have library components internally), not a framework, service, learning resource, or template. So \"Other\" is safest.\n\n\"tags\": Some relevant tags in English from the given topics: chatgpt, claude, embeddings, gemini, obsidian, obsidian-md, obsidian-plugin, related-items, semantic-search, vectors. We should pick a few key ones. Maybe [\"obsidian\", \"obsidian-plugin\", \"semantic-search\", \"embeddings\"]. But keep it to 2-3? The exact format expects an array. Let's pick three: \"obsidian-plugin\", \"semantic-search\", \"embeddings\".\n\nNow, ensure the Korean strings are within 80 chars.\n\nLet's write:\n\nwhat: \"옵시디언에서 관련 노트를 찾고 연결해주는 플러그인\" -> This is 28 chars.\n\nwhy: \"로컬 임베딩 모델로 별도 설정 없이 의미 기반 검색을 제공합니다\" -> This is 33 chars.\n\nuse_case: \"글 작성 중 관련 노트를 실시간으로 추천하여 연결해줍니다\" -> 30 chars.\n\nAll within limits.\n\nFor category: \"Other\"\n\nTags: [\"obsidian-plugin\", \"semantic-search\", \"embeddings\"]\n\nNow output as JSON."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 464,
+    "completion_tokens": 798,
+    "total_tokens": 1262,
+    "prompt_tokens_details": {
+      "cached_tokens": 384
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 689
+    },
+    "prompt_cache_hit_tokens": 384,
+    "prompt_cache_miss_tokens": 80
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

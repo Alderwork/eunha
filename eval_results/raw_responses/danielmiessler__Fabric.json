@@ -1,0 +1,33 @@
+{
+  "id": "825569a3-ea31-4dd0-89cc-054f0338387e",
+  "object": "chat.completion",
+  "created": 1782914303,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"AI를 통한 인간 증강을 위한 오픈소스 프레임워크\",\n  \"why\": \"개발자가 쉽게 AI 프롬프트를 제작하고 공유할 수 있다\",\n  \"use_case\": \"팀에서 AI 프롬프트를 공유하고 재사용하여 업무 자동화에 활용\",\n  \"category\": \"Framework\",\n  \"tags\": [\"ai\", \"augmentation\", \"framework\"]\n}",
+        "reasoning_content": "We are given a GitHub repo: danielmiessler/Fabric. The description says it's an open-source framework for augmenting humans using AI. It provides a modular system for solving specific problems using a crowdsourced set of AI prompts that can be used anywhere. Language: Go. Topics: ai, augmentation, flourishing, life, work.\n\nWe need to write \"what\", \"why\", and \"use_case\" in Korean. Keep \"category\" and \"tags\" in English. Output JSON.\n\nFirst, understand the repo. It's a framework for AI prompts. It's about using AI to augment humans. The README has a sponsor note and then starts with something like \"<img src='./d\" but cut off. So likely it's a tool to manage and use AI prompts.\n\n\"what\": A brief description of what the repo is. In Korean, one sentence, max 80 chars. So: \"AI를 활용한 인간 증강을 위한 오픈소스 프레임워크\" (Open-source framework for human augmentation using AI). But check char count. Let's count: \"AI를 활용한 인간 증강을 위한 오픈소스 프레임워크\" = 23 characters (including spaces? Actually Korean chars are each 1 char in counting? Usually in English we count characters. The instruction says max 80 chars, so probably English or Korean characters count as one. But to be safe, we'll keep it concise. Alternatively, more precise: \"크라우드소싱 AI 프롬프트를 사용하는 모듈형 시스템\" (Modular system using crowdsourced AI prompts). But the description says \"Fabric is an open-source framework for augmenting humans using AI. It provides a modular system for solving specific problems using a crowdsourced set of AI prompts that can be used anywhere.\" So \"what\" should capture that it's a framework.\n\nI'll go with: \"AI를 통한 인간 증강을 위한 오픈소스 프레임워크\" (Open-source framework for human augmentation through AI). Length: 23 chars? Actually count: AI를 통한 인간 증강을 위한 오픈소스 프레임워크 = 22? Let's count: A I 를   통 한   인 간   증 강 을   위 한   오 픈 소 스   프 레 임 워 크 -> each character: 23? I'll just ensure it's within 80 easily.\n\n\"why\": Why a developer would care. In Korean, one sentence max 80 chars. Something like: \"개발자가 쉽게 AI 프롬프트를 제작하고 공유할 수 있다\" (Developers can easily create and share AI prompts). Or \"AI 프롬프트를 모듈식으로 관리하여 생산성을 높일 수 있다\" (Manage AI prompts modularly to increase productivity). I'll choose the first.\n\n\"use_case\": Specific scenario. In Korean, one sentence max 80 chars. For example: \"팀에서 AI 프롬프트를 공유하고 재사용하여 업무 자동화에 활용\" (Share and reuse AI prompts in team for work automation). Or \"개인 비서 AI를 위한 맞춤형 프롬프트를 Fabric으로 관리\" (Manage custom prompts for personal AI assistant with Fabric). I'll pick: \"AI 프롬프트를 중앙집중식으로 관리하여 다양한 작업에 활용\" (Centrally manage AI prompts for various tasks).\n\nNow category: It's a framework, so \"Framework\" fits. But it's also a CLI tool? The language is Go, likely it provides a CLI. The repository has a pattern. But the description says \"framework\". I'll go with \"Framework\".\n\nTags: English, from topics: ai, augmentation, flourishing, life, work. But we should pick 2-4 relevant tags. Since it's about AI prompts, maybe \"ai\", \"prompts\", \"framework\". But the topics are given. I'll use \"ai\", \"augmentation\", \"framework\". But check: The instruction says \"Keep 'category' and 'tags' in English.\" So tags should be in English. I'll include \"ai\", \"automation\", \"prompts\" maybe. But to reflect the repo, I'll use \"ai\", \"augmentation\", \"life\", \"work\" from topics. But that might be too many. Keep to 2-3. I'll do [\"ai\", \"augmentation\", \"framework\"].\n\nLet's construct the JSON.\n\nMake sure the strings are valid JSON. Use double quotes.\n\nFinal output:\n\n{\n  \"what\": \"AI를 통한 인간 증강을 위한 오픈소스 프레임워크\",\n  \"why\": \"개발자가 쉽게 AI 프롬프트를 제작하고 공유할 수 있다\",\n  \"use_case\": \"팀에서 AI 프롬프트를 공유하고 재사용하여 업무 자동화에 활용\",\n  \"category\": \"Framework\",\n  \"tags\": [\"ai\", \"augmentation\", \"framework\"]\n}\n\nBut verify character counts. \"what\" length: 22? Should be fine. \"why\": 26? \"use_case\": 31? All under 80.\n\nAlternatively, I can refine.\n\nMaybe \"why\" should emphasize that it solves specific problems. But I think it's fine.\n\nAlso note that the README excerpt mentions \"Warp\" sponsor, but that's irrelevant.\n\nThus, I'll output the JSON."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 456,
+    "completion_tokens": 1275,
+    "total_tokens": 1731,
+    "prompt_tokens_details": {
+      "cached_tokens": 384
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1168
+    },
+    "prompt_cache_hit_tokens": 384,
+    "prompt_cache_miss_tokens": 72
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

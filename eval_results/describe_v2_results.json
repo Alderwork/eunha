@@ -1,0 +1,641 @@
+{
+  "model": "deepseek-v4-flash",
+  "base_url": "https://opencode.ai/zen/go/v1",
+  "output_language": "Korean",
+  "prompt_version": 2,
+  "described": [
+    {
+      "repo": "anthropics/claude-code",
+      "input": {
+        "full_name": "anthropics/claude-code",
+        "description": "Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows - all through natural language commands.",
+        "language": "Python",
+        "topics": []
+      },
+      "readme_excerpt": "# Claude Code\n\n![](https://img.shields.io/badge/Node.js-18%2B-brightgreen?style=flat-square) [![npm]](https://www.npmjs.com/package/@anthropic-ai/claude-code)\n\n[npm]: https://img.shields.io/npm/v/@anthropic-ai/claude-code.svg?style=flat-square\n\nClaude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows -- all through natural language commands. Use it in you",
+      "prompt": "Given this GitHub repo:\n- Name: anthropics/claude-code\n- GitHub description: Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows - all through natural language commands.\n- Language: Python\n- Topics: \n- README excerpt: # Claude Code\n\n![](https://img.shields.io/badge/Node.js-18%2B-brightgreen?style=flat-square) [![npm]](https://www.npmjs.com/package/@anthropic-ai/claude-code)\n\n[npm]: https://img.shields.io/npm/v/@anthropic-ai/claude-code.svg?style=flat-square\n\nClaude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows -- all through natural language commands. Use it in you\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "Claude Code는 터미널 기반의 에이전트 코딩 도구입니다.",
+        "why": "자연어로 코드 작업을 도와 생산성을 높입니다.",
+        "use_case": "복잡한 코드를 설명하거나 git 작업을 명령어로 수행합니다.",
+        "category": "CLI Tool",
+        "tags": [
+          "AI",
+          "CLI",
+          "developer-tools"
+        ],
+        "raw_json": "{\n  \"what\": \"Claude Code는 터미널 기반의 에이전트 코딩 도구입니다.\",\n  \"why\": \"자연어로 코드 작업을 도와 생산성을 높입니다.\",\n  \"use_case\": \"복잡한 코드를 설명하거나 git 작업을 명령어로 수행합니다.\",\n  \"category\": \"CLI Tool\",\n  \"tags\": [\"AI\", \"CLI\", \"developer-tools\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "google-gemini/gemini-cli",
+      "input": {
+        "full_name": "google-gemini/gemini-cli",
+        "description": "An open-source AI agent that brings the power of Gemini directly into your terminal.",
+        "language": "TypeScript",
+        "topics": [
+          "ai",
+          "ai-agents",
+          "cli",
+          "gemini",
+          "gemini-api",
+          "mcp-client",
+          "mcp-server"
+        ]
+      },
+      "readme_excerpt": "# Gemini CLI\n\n[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)\n[![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)\n[![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)\n[![Lice",
+      "prompt": "Given this GitHub repo:\n- Name: google-gemini/gemini-cli\n- GitHub description: An open-source AI agent that brings the power of Gemini directly into your terminal.\n- Language: TypeScript\n- Topics: ai, ai-agents, cli, gemini, gemini-api, mcp-client, mcp-server\n- README excerpt: # Gemini CLI\n\n[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)\n[![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)\n[![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)\n[![Lice\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "Gemini CLI는 터미널에서 Gemini AI의 기능을 사용할 수 있는 오픈소스 CLI 도구입니다.",
+        "why": "개발자는 복잡한 설정 없이 터미널에서 바로 Gemini AI를 활용할 수 있습니다.",
+        "use_case": "터미널에서 파일 분석, 코드 생성, MCP 서버와 통신 등 다양한 AI 작업을 수행합니다.",
+        "category": "CLI Tool",
+        "tags": [
+          "cli",
+          "gemini",
+          "ai",
+          "mcp-client"
+        ],
+        "raw_json": "{\n  \"what\": \"Gemini CLI는 터미널에서 Gemini AI의 기능을 사용할 수 있는 오픈소스 CLI 도구입니다.\",\n  \"why\": \"개발자는 복잡한 설정 없이 터미널에서 바로 Gemini AI를 활용할 수 있습니다.\",\n  \"use_case\": \"터미널에서 파일 분석, 코드 생성, MCP 서버와 통신 등 다양한 AI 작업을 수행합니다.\",\n  \"category\": \"CLI Tool\",\n  \"tags\": [\"cli\", \"gemini\", \"ai\", \"mcp-client\", \"ai-agents\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "mastra-ai/mastra",
+      "input": {
+        "full_name": "mastra-ai/mastra",
+        "description": "Mastra is the modern TypeScript framework for AI-powered applications and agents.",
+        "language": "TypeScript",
+        "topics": [
+          "agents",
+          "ai",
+          "chatbots",
+          "evals",
+          "javascript",
+          "llm",
+          "mcp",
+          "nextjs",
+          "nodejs",
+          "reactjs",
+          "tts",
+          "typescript",
+          "workflows"
+        ]
+      },
+      "readme_excerpt": "# Mastra\n\n[![npm version](https://badge.fury.io/js/@mastra%2Fcore.svg)](https://www.npmjs.com/package/@mastra/core)\n[![CodeQl](https://github.com/mastra-ai/mastra/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/mastra-ai/mastra/actions/workflows/github-code-scanning/codeql)\n[![GitHub Repo stars](https://img.shields.io/github/stars/mastra-ai/mastra)](https://github.com/mastra-ai/mastra/stargazers)\n[![Discord](https://img.shields.io/discord/1309558646228779139?logo=dis",
+      "prompt": "Given this GitHub repo:\n- Name: mastra-ai/mastra\n- GitHub description: Mastra is the modern TypeScript framework for AI-powered applications and agents.\n- Language: TypeScript\n- Topics: agents, ai, chatbots, evals, javascript, llm, mcp, nextjs, nodejs, reactjs, tts, typescript, workflows\n- README excerpt: # Mastra\n\n[![npm version](https://badge.fury.io/js/@mastra%2Fcore.svg)](https://www.npmjs.com/package/@mastra/core)\n[![CodeQl](https://github.com/mastra-ai/mastra/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/mastra-ai/mastra/actions/workflows/github-code-scanning/codeql)\n[![GitHub Repo stars](https://img.shields.io/github/stars/mastra-ai/mastra)](https://github.com/mastra-ai/mastra/stargazers)\n[![Discord](https://img.shields.io/discord/1309558646228779139?logo=dis\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "Mastra는 AI 기반 애플리케이션과 에이전트를 위한 TypeScript 프레임워크입니다.",
+        "why": "개발자가 복잡한 AI 워크플로우와 에이전트를 쉽게 구축할 수 있습니다.",
+        "use_case": "고객 지원 챗봇 구축이나 문서 처리를 위한 AI 워크플로우 자동화에 사용됩니다.",
+        "category": "Framework",
+        "tags": [
+          "typescript",
+          "ai",
+          "agents",
+          "llm"
+        ],
+        "raw_json": "{\n  \"what\": \"Mastra는 AI 기반 애플리케이션과 에이전트를 위한 TypeScript 프레임워크입니다.\",\n  \"why\": \"개발자가 복잡한 AI 워크플로우와 에이전트를 쉽게 구축할 수 있습니다.\",\n  \"use_case\": \"고객 지원 챗봇 구축이나 문서 처리를 위한 AI 워크플로우 자동화에 사용됩니다.\",\n  \"category\": \"Framework\",\n  \"tags\": [\"typescript\", \"ai\", \"agents\", \"llm\", \"workflows\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "browserbase/stagehand",
+      "input": {
+        "full_name": "browserbase/stagehand",
+        "description": "The SDK For Browser Agents",
+        "language": "TypeScript",
+        "topics": [
+          "agents",
+          "ai",
+          "llms",
+          "playwright",
+          "puppeteer",
+          "selenium"
+        ]
+      },
+      "readme_excerpt": "<div id=\"toc\" align=\"center\" style=\"margin-bottom: 0;\">\n  <ul style=\"list-style: none; margin: 0; padding: 0;\">\n    <a href=\"https://stagehand.dev\">\n      <picture>\n        <source media=\"(prefers-color-scheme: dark)\" srcset=\"media/dark_logo.png\" />\n        <img alt=\"Stagehand\" src=\"media/light_logo.png\" width=\"200\" style=\"margin-right: 30px;\" />\n      </picture>\n    </a>\n  </ul>\n</div>\n<p align=\"center\">\n  <strong>The AI Browser Automation Framework</strong><br>\n  <a href=\"https://docs.stagehan",
+      "prompt": "Given this GitHub repo:\n- Name: browserbase/stagehand\n- GitHub description: The SDK For Browser Agents\n- Language: TypeScript\n- Topics: agents, ai, llms, playwright, puppeteer, selenium\n- README excerpt: <div id=\"toc\" align=\"center\" style=\"margin-bottom: 0;\">\n  <ul style=\"list-style: none; margin: 0; padding: 0;\">\n    <a href=\"https://stagehand.dev\">\n      <picture>\n        <source media=\"(prefers-color-scheme: dark)\" srcset=\"media/dark_logo.png\" />\n        <img alt=\"Stagehand\" src=\"media/light_logo.png\" width=\"200\" style=\"margin-right: 30px;\" />\n      </picture>\n    </a>\n  </ul>\n</div>\n<p align=\"center\">\n  <strong>The AI Browser Automation Framework</strong><br>\n  <a href=\"https://docs.stagehan\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "AI 브라우저 자동화 프레임워크",
+        "why": "개발자가 쉽게 AI 기반 브라우저 작업을 자동화할 수 있습니다.",
+        "use_case": "AI 에이전트가 웹사이트를 자동으로 탐색하여 정보를 수집합니다.",
+        "category": "Framework",
+        "tags": [
+          "agents",
+          "ai",
+          "llms",
+          "playwright"
+        ],
+        "raw_json": "{\n  \"what\": \"AI 브라우저 자동화 프레임워크\",\n  \"why\": \"개발자가 쉽게 AI 기반 브라우저 작업을 자동화할 수 있습니다.\",\n  \"use_case\": \"AI 에이전트가 웹사이트를 자동으로 탐색하여 정보를 수집합니다.\",\n  \"category\": \"Framework\",\n  \"tags\": [\"agents\", \"ai\", \"llms\", \"playwright\", \"puppeteer\", \"selenium\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "danielmiessler/Fabric",
+      "input": {
+        "full_name": "danielmiessler/Fabric",
+        "description": "Fabric is an open-source framework for augmenting humans using AI. It provides a modular system for solving specific problems using a crowdsourced set of AI prompts that can be used anywhere.",
+        "language": "Go",
+        "topics": [
+          "ai",
+          "augmentation",
+          "flourishing",
+          "life",
+          "work"
+        ]
+      },
+      "readme_excerpt": "<div align=\"center\">\n    <a href=\"https://go.warp.dev/fabric\" target=\"_blank\">\n        <sup>Special thanks to:</sup>\n        <br>\n        <img alt=\"Warp sponsorship\" width=\"400\" src=\"https://raw.githubusercontent.com/warpdotdev/brand-assets/refs/heads/main/Github/Sponsor/Warp-Github-LG-02.png\">\n        <br>\n        <h>Warp, built for coding with multiple AI agents</b>\n        <br>\n        <sup>Available for macOS, Linux and Windows</sup>\n    </a>\n</div>\n\n<br>\n\n<div align=\"center\">\n\n<img src=\"./d",
+      "prompt": "Given this GitHub repo:\n- Name: danielmiessler/Fabric\n- GitHub description: Fabric is an open-source framework for augmenting humans using AI. It provides a modular system for solving specific problems using a crowdsourced set of AI prompts that can be used anywhere.\n- Language: Go\n- Topics: ai, augmentation, flourishing, life, work\n- README excerpt: <div align=\"center\">\n    <a href=\"https://go.warp.dev/fabric\" target=\"_blank\">\n        <sup>Special thanks to:</sup>\n        <br>\n        <img alt=\"Warp sponsorship\" width=\"400\" src=\"https://raw.githubusercontent.com/warpdotdev/brand-assets/refs/heads/main/Github/Sponsor/Warp-Github-LG-02.png\">\n        <br>\n        <h>Warp, built for coding with multiple AI agents</b>\n        <br>\n        <sup>Available for macOS, Linux and Windows</sup>\n    </a>\n</div>\n\n<br>\n\n<div align=\"center\">\n\n<img src=\"./d\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "AI를 통한 인간 증강을 위한 오픈소스 프레임워크",
+        "why": "개발자가 쉽게 AI 프롬프트를 제작하고 공유할 수 있다",
+        "use_case": "팀에서 AI 프롬프트를 공유하고 재사용하여 업무 자동화에 활용",
+        "category": "Framework",
+        "tags": [
+          "ai",
+          "augmentation",
+          "framework"
+        ],
+        "raw_json": "{\n  \"what\": \"AI를 통한 인간 증강을 위한 오픈소스 프레임워크\",\n  \"why\": \"개발자가 쉽게 AI 프롬프트를 제작하고 공유할 수 있다\",\n  \"use_case\": \"팀에서 AI 프롬프트를 공유하고 재사용하여 업무 자동화에 활용\",\n  \"category\": \"Framework\",\n  \"tags\": [\"ai\", \"augmentation\", \"framework\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "upstash/context7",
+      "input": {
+        "full_name": "upstash/context7",
+        "description": "Context7 Platform -- Up-to-date code documentation for LLMs and AI code editors",
+        "language": "TypeScript",
+        "topics": [
+          "llm",
+          "mcp",
+          "mcp-server",
+          "vibe-coding"
+        ]
+      },
+      "readme_excerpt": "![Cover](https://github.com/upstash/context7/blob/master/public/cover.png?raw=true)\n\n[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=context7&config=eyJ1cmwiOiJodHRwczovL21jcC5jb250ZXh0Ny5jb20vbWNwIn0%3D)\n\n# Context7 Platform - Up-to-date Code Docs For Any Prompt\n\n[![Website](https://img.shields.io/badge/Website-context7.com-blue)](https://context7.com) [![smithery badge](https://smithery.ai/badge/@upstash/context7-mcp)](https://sm",
+      "prompt": "Given this GitHub repo:\n- Name: upstash/context7\n- GitHub description: Context7 Platform -- Up-to-date code documentation for LLMs and AI code editors\n- Language: TypeScript\n- Topics: llm, mcp, mcp-server, vibe-coding\n- README excerpt: ![Cover](https://github.com/upstash/context7/blob/master/public/cover.png?raw=true)\n\n[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=context7&config=eyJ1cmwiOiJodHRwczovL21jcC5jb250ZXh0Ny5jb20vbWNwIn0%3D)\n\n# Context7 Platform - Up-to-date Code Docs For Any Prompt\n\n[![Website](https://img.shields.io/badge/Website-context7.com-blue)](https://context7.com) [![smithery badge](https://smithery.ai/badge/@upstash/context7-mcp)](https://sm\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "LLM 및 AI 코드 편집기에 최신 코드 문서를 제공하는 MCP 서버 플랫폼",
+        "why": "AI 코드 어시스턴트가 최신 문서를 바탕으로 정확한 조언을 제공하도록 도와줌",
+        "use_case": "LLM 기반 코드 편집기에서 최신 API 문서를 실시간으로 참조하여 코드를 생성할 때",
+        "category": "Service",
+        "tags": [
+          "mcp",
+          "llm",
+          "documentation",
+          "vibe-coding"
+        ],
+        "raw_json": "{\n  \"what\": \"LLM 및 AI 코드 편집기에 최신 코드 문서를 제공하는 MCP 서버 플랫폼\",\n  \"why\": \"AI 코드 어시스턴트가 최신 문서를 바탕으로 정확한 조언을 제공하도록 도와줌\",\n  \"use_case\": \"LLM 기반 코드 편집기에서 최신 API 문서를 실시간으로 참조하여 코드를 생성할 때\",\n  \"category\": \"Service\",\n  \"tags\": [\"mcp\", \"llm\", \"documentation\", \"vibe-coding\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "cocoindex-io/cocoindex-code",
+      "input": {
+        "full_name": "cocoindex-io/cocoindex-code",
+        "description": "A super light-weight embedded code search engine CLI (AST based) that just works - saves 70% token and improves speed for coding agent  🌟 Star if you like it!",
+        "language": "Python",
+        "topics": [
+          "agents",
+          "ast",
+          "claude-code",
+          "cocoindex",
+          "code-search",
+          "codex",
+          "coding-agent",
+          "context-engineering",
+          "context-window",
+          "context-window-optimization",
+          "indexing",
+          "mcp",
+          "open-code",
+          "python",
+          "rust",
+          "tree-sitter"
+        ]
+      },
+      "readme_excerpt": "<p align=\"center\">\n<img width=\"2428\" alt=\"cocoindex code\" src=\"https://github.com/user-attachments/assets/d05961b4-0b7b-42ea-834a-59c3c01717ca\" />\n</p>\n\n\n<h1 align=\"center\">AST-based semantic code search that just works</h1>\n\n![effect](https://github.com/user-attachments/assets/cb3a4cae-0e1f-49c4-890b-7bb93317ab60)\n\n\nA lightweight, effective **(AST-based)** semantic code search tool for your codebase. Built on [CocoIndex](https://github.com/cocoindex-io/cocoindex) — a Rust-based ultra performant",
+      "prompt": "Given this GitHub repo:\n- Name: cocoindex-io/cocoindex-code\n- GitHub description: A super light-weight embedded code search engine CLI (AST based) that just works - saves 70% token and improves speed for coding agent  🌟 Star if you like it!\n- Language: Python\n- Topics: agents, ast, claude-code, cocoindex, code-search, codex, coding-agent, context-engineering, context-window, context-window-optimization, indexing, mcp, open-code, python, rust, tree-sitter\n- README excerpt: <p align=\"center\">\n<img width=\"2428\" alt=\"cocoindex code\" src=\"https://github.com/user-attachments/assets/d05961b4-0b7b-42ea-834a-59c3c01717ca\" />\n</p>\n\n\n<h1 align=\"center\">AST-based semantic code search that just works</h1>\n\n![effect](https://github.com/user-attachments/assets/cb3a4cae-0e1f-49c4-890b-7bb93317ab60)\n\n\nA lightweight, effective **(AST-based)** semantic code search tool for your codebase. Built on [CocoIndex](https://github.com/cocoindex-io/cocoindex) — a Rust-based ultra performant\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "AST 기반 초경량 코드 검색 CLI 도구",
+        "why": "토큰 사용량을 줄이고 코딩 에이전트 속도를 높이는 AST 기반 코드 검색",
+        "use_case": "AI 코딩 에이전트가 코드베이스에서 관련 코드를 빠르게 검색하여 컨텍스트를 최적화할 때 사용",
+        "category": "CLI Tool",
+        "tags": [
+          "code-search",
+          "ast"
+        ],
+        "raw_json": "{\n  \"what\": \"AST 기반 초경량 코드 검색 CLI 도구\",\n  \"why\": \"토큰 사용량을 줄이고 코딩 에이전트 속도를 높이는 AST 기반 코드 검색\",\n  \"use_case\": \"AI 코딩 에이전트가 코드베이스에서 관련 코드를 빠르게 검색하여 컨텍스트를 최적화할 때 사용\",\n  \"category\": \"CLI Tool\",\n  \"tags\": [\"code-search\", \"ast\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "tw93/Kaku",
+      "input": {
+        "full_name": "tw93/Kaku",
+        "description": "🎃 A fast, out-of-the-box terminal built for AI coding.",
+        "language": "Rust",
+        "topics": [
+          "ai-coding",
+          "macos",
+          "rust",
+          "serial",
+          "terminal",
+          "terminal-app",
+          "terminal-emulator",
+          "vibe-coding"
+        ]
+      },
+      "readme_excerpt": "<div align=\"center\">\n  <img src=\"https://gw.alipayobjects.com/zos/k/6h/dwarf.svg\" width=\"120\" />\n  <h1>Kaku</h1>\n  <p><em>A fast, out-of-the-box terminal built for AI coding.</em></p>\n</div>\n\n<p align=\"center\">\n  <a href=\"https://github.com/tw93/Kaku/stargazers\"><img src=\"https://img.shields.io/github/stars/tw93/Kaku?style=flat-square\" alt=\"Stars\"></a>\n  <a href=\"https://github.com/tw93/Kaku/releases\"><img src=\"https://img.shields.io/github/v/tag/tw93/Kaku?label=version&style=flat-square\" alt=\"V",
+      "prompt": "Given this GitHub repo:\n- Name: tw93/Kaku\n- GitHub description: 🎃 A fast, out-of-the-box terminal built for AI coding.\n- Language: Rust\n- Topics: ai-coding, macos, rust, serial, terminal, terminal-app, terminal-emulator, vibe-coding\n- README excerpt: <div align=\"center\">\n  <img src=\"https://gw.alipayobjects.com/zos/k/6h/dwarf.svg\" width=\"120\" />\n  <h1>Kaku</h1>\n  <p><em>A fast, out-of-the-box terminal built for AI coding.</em></p>\n</div>\n\n<p align=\"center\">\n  <a href=\"https://github.com/tw93/Kaku/stargazers\"><img src=\"https://img.shields.io/github/stars/tw93/Kaku?style=flat-square\" alt=\"Stars\"></a>\n  <a href=\"https://github.com/tw93/Kaku/releases\"><img src=\"https://img.shields.io/github/v/tag/tw93/Kaku?label=version&style=flat-square\" alt=\"V\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "Kaku는 AI 코딩을 위한 빠르고 바로 사용 가능한 터미널입니다.",
+        "why": "AI 코딩 작업에 최적화된 터미널로, 별도 설정 없이 바로 사용할 수 있습니다.",
+        "use_case": "개발자가 복잡한 터미널 설정 없이 AI 코딩을 시작하려는 경우.",
+        "category": "Other",
+        "tags": [
+          "ai-coding",
+          "terminal",
+          "rust"
+        ],
+        "raw_json": "{\n  \"what\": \"Kaku는 AI 코딩을 위한 빠르고 바로 사용 가능한 터미널입니다.\",\n  \"why\": \"AI 코딩 작업에 최적화된 터미널로, 별도 설정 없이 바로 사용할 수 있습니다.\",\n  \"use_case\": \"개발자가 복잡한 터미널 설정 없이 AI 코딩을 시작하려는 경우.\",\n  \"category\": \"Other\",\n  \"tags\": [\"ai-coding\", \"terminal\", \"rust\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "micro/go-micro",
+      "input": {
+        "full_name": "micro/go-micro",
+        "description": "A Go agent harness and service framework",
+        "language": "Go",
+        "topics": [
+          "ai",
+          "ai-agents",
+          "distributed-systems",
+          "go",
+          "golang",
+          "mcp",
+          "micro",
+          "microservices"
+        ]
+      },
+      "readme_excerpt": "# Go Micro [![Go.Dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/go-micro.dev/v6?tab=doc) [![Go Report Card](https://goreportcard.com/badge/github.com/go-micro/go-micro)](https://goreportcard.com/report/github.com/go-micro/go-micro)\n\nGo Micro is an **agent harness** and service framework for Go.\n\nA harness is the runtime around an agent: the tools it can call, the memory it keeps, the guardrails that bound it, the",
+      "prompt": "Given this GitHub repo:\n- Name: micro/go-micro\n- GitHub description: A Go agent harness and service framework\n- Language: Go\n- Topics: ai, ai-agents, distributed-systems, go, golang, mcp, micro, microservices\n- README excerpt: # Go Micro [![Go.Dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/go-micro.dev/v6?tab=doc) [![Go Report Card](https://goreportcard.com/badge/github.com/go-micro/go-micro)](https://goreportcard.com/report/github.com/go-micro/go-micro)\n\nGo Micro is an **agent harness** and service framework for Go.\n\nA harness is the runtime around an agent: the tools it can call, the memory it keeps, the guardrails that bound it, the\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "Go Micro는 Go 언어용 에이전트 하네스 및 서비스 프레임워크입니다.",
+        "why": "Go 기반 마이크로서비스 및 AI 에이전트 개발을 단순화합니다.",
+        "use_case": "AI 에이전트를 포함한 마이크로서비스 아키텍처 구축",
+        "category": "Framework",
+        "tags": [
+          "go",
+          "microservices",
+          "ai-agents",
+          "distributed-systems"
+        ],
+        "raw_json": "{\n  \"what\": \"Go Micro는 Go 언어용 에이전트 하네스 및 서비스 프레임워크입니다.\",\n  \"why\": \"Go 기반 마이크로서비스 및 AI 에이전트 개발을 단순화합니다.\",\n  \"use_case\": \"AI 에이전트를 포함한 마이크로서비스 아키텍처 구축\",\n  \"category\": \"Framework\",\n  \"tags\": [\"go\", \"microservices\", \"ai-agents\", \"distributed-systems\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "spacedriveapp/spacebot",
+      "input": {
+        "full_name": "spacedriveapp/spacebot",
+        "description": "An AI agent for teams, communities, and multi-user environments.",
+        "language": "Rust",
+        "topics": [
+          "agent",
+          "agentic",
+          "ai",
+          "automation",
+          "developer-tools",
+          "enterprise",
+          "messaging"
+        ]
+      },
+      "readme_excerpt": "<p align=\"center\">\n  <img src=\".github/Ball.png\" alt=\"Spacebot\" width=\"120\" height=\"120\" />\n</p>\n\n<h1 align=\"center\">Spacebot</h1>\n\n<p align=\"center\">\n  <strong>The agent harness that runs teams, communities, and companies.</strong>\n</p>\n\n<p align=\"center\">\n  <a href=\"https://fsl.software/\">\n    <img src=\"https://img.shields.io/static/v1?label=License&message=FSL-1.1-ALv2&color=000\" />\n  </a>\n  <a href=\"https://github.com/spacedriveapp/spacebot\">\n    <img src=\"https://img.shields.io/static/v1?la",
+      "prompt": "Given this GitHub repo:\n- Name: spacedriveapp/spacebot\n- GitHub description: An AI agent for teams, communities, and multi-user environments.\n- Language: Rust\n- Topics: agent, agentic, ai, automation, developer-tools, enterprise, messaging\n- README excerpt: <p align=\"center\">\n  <img src=\".github/Ball.png\" alt=\"Spacebot\" width=\"120\" height=\"120\" />\n</p>\n\n<h1 align=\"center\">Spacebot</h1>\n\n<p align=\"center\">\n  <strong>The agent harness that runs teams, communities, and companies.</strong>\n</p>\n\n<p align=\"center\">\n  <a href=\"https://fsl.software/\">\n    <img src=\"https://img.shields.io/static/v1?label=License&message=FSL-1.1-ALv2&color=000\" />\n  </a>\n  <a href=\"https://github.com/spacedriveapp/spacebot\">\n    <img src=\"https://img.shields.io/static/v1?la\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "팀, 커뮤니티, 기업을 위한 AI 에이전트 하네스",
+        "why": "러스트로 작성된 오픈소스 AI 에이전트 프레임워크로 팀 협업 자동화",
+        "use_case": "AI 에이전트를 이용한 팀 협업 및 커뮤니케이션 자동화",
+        "category": "Framework",
+        "tags": [
+          "agent",
+          "ai",
+          "automation",
+          "developer-tools"
+        ],
+        "raw_json": "{\n  \"what\": \"팀, 커뮤니티, 기업을 위한 AI 에이전트 하네스\",\n  \"why\": \"러스트로 작성된 오픈소스 AI 에이전트 프레임워크로 팀 협업 자동화\",\n  \"use_case\": \"AI 에이전트를 이용한 팀 협업 및 커뮤니케이션 자동화\",\n  \"category\": \"Framework\",\n  \"tags\": [\"agent\", \"ai\", \"automation\", \"developer-tools\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "gastownhall/gastown",
+      "input": {
+        "full_name": "gastownhall/gastown",
+        "description": "Gas Town - multi-agent workspace manager",
+        "language": "Go",
+        "topics": []
+      },
+      "readme_excerpt": "# Gas Town\n\n**Multi-agent orchestration system for Claude Code, GitHub Copilot, and other AI agents with persistent work tracking**\n\n## Overview\n\nGas Town is a workspace manager that lets you coordinate multiple AI coding agents (Claude Code, GitHub Copilot, Codex, Gemini, and others) working on different tasks. Instead of losing context when agents restart, Gas Town persists work state in git-backed hooks, enabling reliable multi-agent workflows.\n\n### What Problem Does This Solve?\n\n| Challenge ",
+      "prompt": "Given this GitHub repo:\n- Name: gastownhall/gastown\n- GitHub description: Gas Town - multi-agent workspace manager\n- Language: Go\n- Topics: \n- README excerpt: # Gas Town\n\n**Multi-agent orchestration system for Claude Code, GitHub Copilot, and other AI agents with persistent work tracking**\n\n## Overview\n\nGas Town is a workspace manager that lets you coordinate multiple AI coding agents (Claude Code, GitHub Copilot, Codex, Gemini, and others) working on different tasks. Instead of losing context when agents restart, Gas Town persists work state in git-backed hooks, enabling reliable multi-agent workflows.\n\n### What Problem Does This Solve?\n\n| Challenge \n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "여러 AI 개발 에이전트를 하나의 워크스페이스에서 관리하는 도구",
+        "why": "AI 에이전트 간 작업 상태를 유지하여 생산성 향상",
+        "use_case": "Claude Code와 Copilot이 같은 프로젝트에서 각자 작업하고 결과를 동기화할 때",
+        "category": "CLI Tool",
+        "tags": [
+          "multi-agent",
+          "orchestration"
+        ],
+        "raw_json": "{\n  \"what\": \"여러 AI 개발 에이전트를 하나의 워크스페이스에서 관리하는 도구\",\n  \"why\": \"AI 에이전트 간 작업 상태를 유지하여 생산성 향상\",\n  \"use_case\": \"Claude Code와 Copilot이 같은 프로젝트에서 각자 작업하고 결과를 동기화할 때\",\n  \"category\": \"CLI Tool\",\n  \"tags\": [\"multi-agent\", \"orchestration\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "microsoft/RD-Agent",
+      "input": {
+        "full_name": "microsoft/RD-Agent",
+        "description": "Research and development (R&D) is crucial for the enhancement of industrial productivity, especially in the AI era, where the core aspects of R&D are mainly focused on data and models. We are committed to automating these high-value generic R&D processes through R&D-Agent, which lets AI drive data-driven AI. 🔗https://aka.ms/RD-Agent-Tech-Report",
+        "language": "Python",
+        "topics": [
+          "agent",
+          "ai",
+          "automation",
+          "data-mining",
+          "data-science",
+          "development",
+          "llm",
+          "research"
+        ]
+      },
+      "readme_excerpt": "<h4 align=\"center\">\n  <img src=\"docs/_static/logo.png\" alt=\"RA-Agent logo\" style=\"width:70%; \">\n  \n  <a href=\"https://rdagent.azurewebsites.net\" target=\"_blank\">🖥️ Live Demo</a> |\n  <a href=\"https://rdagent.azurewebsites.net/factor_loop\" target=\"_blank\">🎥 Demo Video</a> <a href=\"https://www.youtube.com/watch?v=JJ4JYO3HscM&list=PLALmKB0_N3_i52fhUmPQiL4jsO354uopR\" target=\"_blank\">▶️YouTube</a>   |\n  <a href=\"https://rdagent.readthedocs.io/en/latest/index.html\" target=\"_blank\">📖 Documentation</a> |",
+      "prompt": "Given this GitHub repo:\n- Name: microsoft/RD-Agent\n- GitHub description: Research and development (R&D) is crucial for the enhancement of industrial productivity, especially in the AI era, where the core aspects of R&D are mainly focused on data and models. We are committed to automating these high-value generic R&D processes through R&D-Agent, which lets AI drive data-driven AI. 🔗https://aka.ms/RD-Agent-Tech-Report\n- Language: Python\n- Topics: agent, ai, automation, data-mining, data-science, development, llm, research\n- README excerpt: <h4 align=\"center\">\n  <img src=\"docs/_static/logo.png\" alt=\"RA-Agent logo\" style=\"width:70%; \">\n  \n  <a href=\"https://rdagent.azurewebsites.net\" target=\"_blank\">🖥️ Live Demo</a> |\n  <a href=\"https://rdagent.azurewebsites.net/factor_loop\" target=\"_blank\">🎥 Demo Video</a> <a href=\"https://www.youtube.com/watch?v=JJ4JYO3HscM&list=PLALmKB0_N3_i52fhUmPQiL4jsO354uopR\" target=\"_blank\">▶️YouTube</a>   |\n  <a href=\"https://rdagent.readthedocs.io/en/latest/index.html\" target=\"_blank\">📖 Documentation</a> |\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "RD-Agent는 데이터와 모델 개발을 자동화하는 AI 에이전트입니다.",
+        "why": "자동화로 R&D의 생산성을 높여 시간과 비용을 절감합니다.",
+        "use_case": "데이터 과학자가 복잡한 데이터에서 인사이트를 자동으로 추출하는 데 사용합니다.",
+        "category": "Framework",
+        "tags": [
+          "agent",
+          "ai",
+          "automation",
+          "data-science"
+        ],
+        "raw_json": "{\n  \"what\": \"RD-Agent는 데이터와 모델 개발을 자동화하는 AI 에이전트입니다.\",\n  \"why\": \"자동화로 R&D의 생산성을 높여 시간과 비용을 절감합니다.\",\n  \"use_case\": \"데이터 과학자가 복잡한 데이터에서 인사이트를 자동으로 추출하는 데 사용합니다.\",\n  \"category\": \"Framework\",\n  \"tags\": [\"agent\", \"ai\", \"automation\", \"data-science\", \"research\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "karakeep-app/karakeep",
+      "input": {
+        "full_name": "karakeep-app/karakeep",
+        "description": "A self-hostable bookmark-everything app (links, notes and images) with AI-based automatic tagging and full text search",
+        "language": "TypeScript",
+        "topics": [
+          "bookmark-manager",
+          "bookmarks",
+          "bookmarks-manager",
+          "nextjs",
+          "react-native",
+          "read-it-later",
+          "self-hosted"
+        ]
+      },
+      "readme_excerpt": "<div align=\"center\">\n    <a href=\"https://github.com/karakeep-app/karakeep/actions/workflows/ci.yml\">\n        <img alt=\"GitHub Actions Workflow Status\" src=\"https://img.shields.io/github/actions/workflow/status/karakeep-app/karakeep/ci.yml\" />\n    </a>\n    <a href=\"https://github.com/karakeep-app/karakeep/releases\">\n        <img alt=\"GitHub Release\" src=\"https://img.shields.io/github/v/release/karakeep-app/karakeep\" />\n    </a>\n    <a href=\"https://discord.gg/NrgeYywsFh\">\n        <img alt=\"Disco",
+      "prompt": "Given this GitHub repo:\n- Name: karakeep-app/karakeep\n- GitHub description: A self-hostable bookmark-everything app (links, notes and images) with AI-based automatic tagging and full text search\n- Language: TypeScript\n- Topics: bookmark-manager, bookmarks, bookmarks-manager, nextjs, react-native, read-it-later, self-hosted\n- README excerpt: <div align=\"center\">\n    <a href=\"https://github.com/karakeep-app/karakeep/actions/workflows/ci.yml\">\n        <img alt=\"GitHub Actions Workflow Status\" src=\"https://img.shields.io/github/actions/workflow/status/karakeep-app/karakeep/ci.yml\" />\n    </a>\n    <a href=\"https://github.com/karakeep-app/karakeep/releases\">\n        <img alt=\"GitHub Release\" src=\"https://img.shields.io/github/v/release/karakeep-app/karakeep\" />\n    </a>\n    <a href=\"https://discord.gg/NrgeYywsFh\">\n        <img alt=\"Disco\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "AI 기반 자동 태깅과 전체 텍스트 검색을 지원하는 셀프 호스팅 북마크 앱",
+        "why": "데이터를 자체 보관할 수 있고 AI 기능으로 북마크를 효율적으로 관리할 수 있다.",
+        "use_case": "웹 링크, 노트, 이미지를 수집하고 AI로 자동 분류하여 나중에 검색할 때",
+        "category": "Service",
+        "tags": [
+          "bookmark-manager",
+          "self-hosted",
+          "read-it-later",
+          "nextjs"
+        ],
+        "raw_json": "{\n  \"what\": \"AI 기반 자동 태깅과 전체 텍스트 검색을 지원하는 셀프 호스팅 북마크 앱\",\n  \"why\": \"데이터를 자체 보관할 수 있고 AI 기능으로 북마크를 효율적으로 관리할 수 있다.\",\n  \"use_case\": \"웹 링크, 노트, 이미지를 수집하고 AI로 자동 분류하여 나중에 검색할 때\",\n  \"category\": \"Service\",\n  \"tags\": [\"bookmark-manager\", \"self-hosted\", \"read-it-later\", \"nextjs\", \"react-native\", \"typescript\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "brianpetro/obsidian-smart-connections",
+      "input": {
+        "full_name": "brianpetro/obsidian-smart-connections",
+        "description": "Find related notes and excerpts while writing. Your link building copilot displays relevant content in graph + list view. A local embedding model powers semantic search. Zero setup. No API key.",
+        "language": "JavaScript",
+        "topics": [
+          "chatgpt",
+          "claude",
+          "embeddings",
+          "gemini",
+          "obsidian",
+          "obsidian-md",
+          "obsidian-plugin",
+          "related-items",
+          "semantic-search",
+          "vectors"
+        ]
+      },
+      "readme_excerpt": "***Save time* linking, tagging, and organizing:** Smart Connections finds relevant notes *so you don't have to!*\n\n<h2 align=\"center\">\nMore time for what matters most<br>\n<a href=\"https://smartconnections.app/?utm_source=README-what-matters-most\" target=\"_external\"><img src=\"/assets/SC-OP-more-time-for.gif\" alt=\"More time for what matters most\" width=\"300\"/></a>\n</h2>\n\n> I just stumbled across a forgotten 20-page Google Doc I poured my heart into months ago, and the rush of lost momentum hit me l",
+      "prompt": "Given this GitHub repo:\n- Name: brianpetro/obsidian-smart-connections\n- GitHub description: Find related notes and excerpts while writing. Your link building copilot displays relevant content in graph + list view. A local embedding model powers semantic search. Zero setup. No API key.\n- Language: JavaScript\n- Topics: chatgpt, claude, embeddings, gemini, obsidian, obsidian-md, obsidian-plugin, related-items, semantic-search, vectors\n- README excerpt: ***Save time* linking, tagging, and organizing:** Smart Connections finds relevant notes *so you don't have to!*\n\n<h2 align=\"center\">\nMore time for what matters most<br>\n<a href=\"https://smartconnections.app/?utm_source=README-what-matters-most\" target=\"_external\"><img src=\"/assets/SC-OP-more-time-for.gif\" alt=\"More time for what matters most\" width=\"300\"/></a>\n</h2>\n\n> I just stumbled across a forgotten 20-page Google Doc I poured my heart into months ago, and the rush of lost momentum hit me l\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "옵시디언에서 관련 노트를 찾고 연결해주는 플러그인",
+        "why": "로컬 임베딩 모델로 별도 설정 없이 의미 기반 검색을 제공합니다",
+        "use_case": "글 작성 중 관련 노트를 실시간으로 추천하여 연결해줍니다",
+        "category": "Other",
+        "tags": [
+          "obsidian-plugin",
+          "semantic-search",
+          "embeddings"
+        ],
+        "raw_json": "{\n  \"what\": \"옵시디언에서 관련 노트를 찾고 연결해주는 플러그인\",\n  \"why\": \"로컬 임베딩 모델로 별도 설정 없이 의미 기반 검색을 제공합니다\",\n  \"use_case\": \"글 작성 중 관련 노트를 실시간으로 추천하여 연결해줍니다\",\n  \"category\": \"Other\",\n  \"tags\": [\"obsidian-plugin\", \"semantic-search\", \"embeddings\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "nhaouari/obsidian-textgenerator-plugin",
+      "input": {
+        "full_name": "nhaouari/obsidian-textgenerator-plugin",
+        "description": "Text Generator is a versatile plugin for Obsidian that allows you to generate text content using various AI providers, including OpenAI, Anthropic, Google and local models.",
+        "language": "TypeScript",
+        "topics": [
+          "ai",
+          "chatgpt",
+          "gpt-3",
+          "gpt-4",
+          "huggingface",
+          "llm",
+          "nlg",
+          "obsidian",
+          "obsidian-plugin",
+          "openai",
+          "pkm",
+          "plugin",
+          "writing",
+          "writing-tool"
+        ]
+      },
+      "readme_excerpt": "<h1 align=\"center\">obsidian-textgenerator-plugin</h1>\n\n<div align=\"center\">\n  <a href=\"https://bit.ly/tg_docs\">Documentation</a>\n  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>\n  <a href=\"https://discord.gg/mEhvhkRfq5\">Discord</a>\n  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>\n  <a href=\"https://img.shields.io/twitter/follow/TextGenPlugin?style=social)](https://twitter.com/intent/follow?screen_name=TextGenPlugin\">Twitter</a>\n  <br />\n  <br />\n  <br />\n</div>\n\n## What is Text Generator?\n\n**Text Generator** is",
+      "prompt": "Given this GitHub repo:\n- Name: nhaouari/obsidian-textgenerator-plugin\n- GitHub description: Text Generator is a versatile plugin for Obsidian that allows you to generate text content using various AI providers, including OpenAI, Anthropic, Google and local models.\n- Language: TypeScript\n- Topics: ai, chatgpt, gpt-3, gpt-4, huggingface, llm, nlg, obsidian, obsidian-plugin, openai, pkm, plugin, writing, writing-tool\n- README excerpt: <h1 align=\"center\">obsidian-textgenerator-plugin</h1>\n\n<div align=\"center\">\n  <a href=\"https://bit.ly/tg_docs\">Documentation</a>\n  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>\n  <a href=\"https://discord.gg/mEhvhkRfq5\">Discord</a>\n  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>\n  <a href=\"https://img.shields.io/twitter/follow/TextGenPlugin?style=social)](https://twitter.com/intent/follow?screen_name=TextGenPlugin\">Twitter</a>\n  <br />\n  <br />\n  <br />\n</div>\n\n## What is Text Generator?\n\n**Text Generator** is\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "Obsidian에서 다양한 AI 제공업체로 텍스트를 생성하는 플러그인입니다.",
+        "why": "개발자는 이 플러그인을 통해 Obsidian에 AI 글쓰기 기능을 손쉽게 통합할 수 있습니다.",
+        "use_case": "Obsidian 노트에서 AI를 활용하여 글의 초안을 자동 생성할 때 사용합니다.",
+        "category": "Other",
+        "tags": [
+          "obsidian-plugin",
+          "ai",
+          "text-generation"
+        ],
+        "raw_json": "{\n  \"what\": \"Obsidian에서 다양한 AI 제공업체로 텍스트를 생성하는 플러그인입니다.\",\n  \"why\": \"개발자는 이 플러그인을 통해 Obsidian에 AI 글쓰기 기능을 손쉽게 통합할 수 있습니다.\",\n  \"use_case\": \"Obsidian 노트에서 AI를 활용하여 글의 초안을 자동 생성할 때 사용합니다.\",\n  \"category\": \"Other\",\n  \"tags\": [\"obsidian-plugin\", \"ai\", \"text-generation\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "PleasePrompto/notebooklm-mcp",
+      "input": {
+        "full_name": "PleasePrompto/notebooklm-mcp",
+        "description": "MCP server for NotebookLM - Let your AI agents (Claude Code, Codex) research documentation directly with grounded, citation-backed answers from Gemini. Persistent auth, library management, cross-client sharing. Zero hallucinations, just your knowledge base.",
+        "language": "TypeScript",
+        "topics": []
+      },
+      "readme_excerpt": "# NotebookLM MCP Server\n\n[![npm](https://img.shields.io/npm/v/notebooklm-mcp.svg)](https://www.npmjs.com/package/notebooklm-mcp)\n[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)\n[![MCP](https://img.shields.io/badge/MCP-Streamable--HTTP-green.svg)](https://modelcontextprotocol.io/)\n[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)\n\nMCP server for Google NotebookLM. It drives a real Chrome via Patchright (stealth + pers",
+      "prompt": "Given this GitHub repo:\n- Name: PleasePrompto/notebooklm-mcp\n- GitHub description: MCP server for NotebookLM - Let your AI agents (Claude Code, Codex) research documentation directly with grounded, citation-backed answers from Gemini. Persistent auth, library management, cross-client sharing. Zero hallucinations, just your knowledge base.\n- Language: TypeScript\n- Topics: \n- README excerpt: # NotebookLM MCP Server\n\n[![npm](https://img.shields.io/npm/v/notebooklm-mcp.svg)](https://www.npmjs.com/package/notebooklm-mcp)\n[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)\n[![MCP](https://img.shields.io/badge/MCP-Streamable--HTTP-green.svg)](https://modelcontextprotocol.io/)\n[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)\n\nMCP server for Google NotebookLM. It drives a real Chrome via Patchright (stealth + pers\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "NotebookLM MCP 서버로, AI 에이전트가 구글 노트북LM을 통해 문서를 검색하고 인용된 답변을 제공합니다.",
+        "why": "개발자는 이를 통해 AI 에이전트에 신뢰할 수 있는 문서 검색 및 인용 기능을 추가할 수 있습니다.",
+        "use_case": "Claude Code나 Codex 같은 AI 에이전트가 프로젝트 문서를 직접 검색하고 인용된 답변을 얻는 시나리오.",
+        "category": "Service",
+        "tags": [
+          "MCP",
+          "NotebookLM",
+          "TypeScript",
+          "Gemini"
+        ],
+        "raw_json": "{\n  \"what\": \"NotebookLM MCP 서버로, AI 에이전트가 구글 노트북LM을 통해 문서를 검색하고 인용된 답변을 제공합니다.\",\n  \"why\": \"개발자는 이를 통해 AI 에이전트에 신뢰할 수 있는 문서 검색 및 인용 기능을 추가할 수 있습니다.\",\n  \"use_case\": \"Claude Code나 Codex 같은 AI 에이전트가 프로젝트 문서를 직접 검색하고 인용된 답변을 얻는 시나리오.\",\n  \"category\": \"Service\",\n  \"tags\": [\"MCP\", \"NotebookLM\", \"TypeScript\", \"Gemini\", \"Documentation Search\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "stickerdaniel/linkedin-mcp-server",
+      "input": {
+        "full_name": "stickerdaniel/linkedin-mcp-server",
+        "description": "Open-source MCP server for LinkedIn. Give Claude and any MCP-compatible AI agent access to profiles, companies, jobs, and messages.",
+        "language": "Python",
+        "topics": [
+          "ai-agents",
+          "anthropic",
+          "chatgpt",
+          "chatgpt-desktop",
+          "claude",
+          "claude-ai",
+          "claude-code",
+          "claude-desktop",
+          "desktop-extension",
+          "dxt",
+          "linkedin",
+          "linkedin-api",
+          "linkedin-mcp",
+          "linkedin-profile-scraper",
+          "linkedin-scraper",
+          "mcp",
+          "mcp-server",
+          "model-context-protocol",
+          "python"
+        ]
+      },
+      "readme_excerpt": "# MCP Server for LinkedIn\n\n<p align=\"left\">\n  <a href=\"https://pypi.org/project/mcp-server-linkedin/\" target=\"_blank\"><img src=\"https://img.shields.io/pypi/v/mcp-server-linkedin?color=blue\" alt=\"PyPI\"></a>\n  <a href=\"https://github.com/stickerdaniel/linkedin-mcp-server/actions/workflows/ci.yml\" target=\"_blank\"><img src=\"https://github.com/stickerdaniel/linkedin-mcp-server/actions/workflows/ci.yml/badge.svg?branch=main\" alt=\"CI Status\"></a>\n  <a href=\"https://github.com/stickerdaniel/linkedin-mcp",
+      "prompt": "Given this GitHub repo:\n- Name: stickerdaniel/linkedin-mcp-server\n- GitHub description: Open-source MCP server for LinkedIn. Give Claude and any MCP-compatible AI agent access to profiles, companies, jobs, and messages.\n- Language: Python\n- Topics: ai-agents, anthropic, chatgpt, chatgpt-desktop, claude, claude-ai, claude-code, claude-desktop, desktop-extension, dxt, linkedin, linkedin-api, linkedin-mcp, linkedin-profile-scraper, linkedin-scraper, mcp, mcp-server, model-context-protocol, python\n- README excerpt: # MCP Server for LinkedIn\n\n<p align=\"left\">\n  <a href=\"https://pypi.org/project/mcp-server-linkedin/\" target=\"_blank\"><img src=\"https://img.shields.io/pypi/v/mcp-server-linkedin?color=blue\" alt=\"PyPI\"></a>\n  <a href=\"https://github.com/stickerdaniel/linkedin-mcp-server/actions/workflows/ci.yml\" target=\"_blank\"><img src=\"https://github.com/stickerdaniel/linkedin-mcp-server/actions/workflows/ci.yml/badge.svg?branch=main\" alt=\"CI Status\"></a>\n  <a href=\"https://github.com/stickerdaniel/linkedin-mcp\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "LinkedIn MCP 서버는 AI 에이전트가 LinkedIn 데이터에 접근할 수 있게 합니다.",
+        "why": "개발자는 별도 통합 없이 LinkedIn 데이터를 AI 에이전트에 연동할 수 있습니다.",
+        "use_case": "AI 비서가 사용자를 대신해 LinkedIn 프로필이나 메시지를 검색합니다.",
+        "category": "Service",
+        "tags": [
+          "mcp-server",
+          "linkedin",
+          "ai-agents",
+          "python"
+        ],
+        "raw_json": "{\n  \"what\": \"LinkedIn MCP 서버는 AI 에이전트가 LinkedIn 데이터에 접근할 수 있게 합니다.\",\n  \"why\": \"개발자는 별도 통합 없이 LinkedIn 데이터를 AI 에이전트에 연동할 수 있습니다.\",\n  \"use_case\": \"AI 비서가 사용자를 대신해 LinkedIn 프로필이나 메시지를 검색합니다.\",\n  \"category\": \"Service\",\n  \"tags\": [\"mcp-server\", \"linkedin\", \"ai-agents\", \"python\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "srbhr/Resume-Matcher",
+      "input": {
+        "full_name": "srbhr/Resume-Matcher",
+        "description": "Improve your resumes with Resume Matcher. Get insights, keyword suggestions and tune your resumes to job descriptions. ",
+        "language": "TypeScript",
+        "topics": [
+          "applicant-tracking-system",
+          "ats",
+          "hacktoberfest",
+          "machine-learning",
+          "natural-language-processing",
+          "nextjs",
+          "python",
+          "resume",
+          "resume-builder",
+          "resume-parser",
+          "text-similarity",
+          "typescript",
+          "vector-search",
+          "word-embeddings"
+        ]
+      },
+      "readme_excerpt": "<div align=\"center\">\n\n[![Resume Matcher](assets/header.png)](https://www.resumematcher.fyi)\n\n# Resume Matcher\n\n[𝙹𝚘𝚒𝚗 𝙳𝚒𝚜𝚌𝚘𝚛𝚍](https://dsc.gg/resume-matcher) ✦ [𝚆𝚎𝚋𝚜𝚒𝚝𝚎](https://resumematcher.fyi) ✦ [𝙷𝚘𝚠 𝚝𝚘 𝙸𝚗𝚜𝚝𝚊𝚕𝚕](https://resumematcher.fyi/docs/installation) ✦ [𝙲𝚘𝚗𝚝𝚛𝚒𝚋𝚞𝚝𝚘𝚛𝚜](#contributors) ✦ [𝚂𝚙𝚘𝚗𝚜𝚘𝚛](#sponsor-resume-matcher) ✦ [𝚃𝚠𝚒𝚝𝚝𝚎𝚛/𝚇](https://twitter.com/srbhrai) ✦ [𝙻𝚒𝚗𝚔𝚎𝚍𝙸𝚗](https://www.linkedin.com/company/resume-matcher/) ✦ [𝙲𝚛𝚎𝚊𝚝𝚘𝚛](https://srbhr.com)\n\n**English** | [Español](README.es",
+      "prompt": "Given this GitHub repo:\n- Name: srbhr/Resume-Matcher\n- GitHub description: Improve your resumes with Resume Matcher. Get insights, keyword suggestions and tune your resumes to job descriptions. \n- Language: TypeScript\n- Topics: applicant-tracking-system, ats, hacktoberfest, machine-learning, natural-language-processing, nextjs, python, resume, resume-builder, resume-parser, text-similarity, typescript, vector-search, word-embeddings\n- README excerpt: <div align=\"center\">\n\n[![Resume Matcher](assets/header.png)](https://www.resumematcher.fyi)\n\n# Resume Matcher\n\n[𝙹𝚘𝚒𝚗 𝙳𝚒𝚜𝚌𝚘𝚛𝚍](https://dsc.gg/resume-matcher) ✦ [𝚆𝚎𝚋𝚜𝚒𝚝𝚎](https://resumematcher.fyi) ✦ [𝙷𝚘𝚠 𝚝𝚘 𝙸𝚗𝚜𝚝𝚊𝚕𝚕](https://resumematcher.fyi/docs/installation) ✦ [𝙲𝚘𝚗𝚝𝚛𝚒𝚋𝚞𝚝𝚘𝚛𝚜](#contributors) ✦ [𝚂𝚙𝚘𝚗𝚜𝚘𝚛](#sponsor-resume-matcher) ✦ [𝚃𝚠𝚒𝚝𝚝𝚎𝚛/𝚇](https://twitter.com/srbhrai) ✦ [𝙻𝚒𝚗𝚔𝚎𝚍𝙸𝚗](https://www.linkedin.com/company/resume-matcher/) ✦ [𝙲𝚛𝚎𝚊𝚝𝚘𝚛](https://srbhr.com)\n\n**English** | [Español](README.es\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "이력서를 구인 공고에 맞게 최적화하는 서비스입니다.",
+        "why": "개발자는 이 도구로 이력서를 개선하여 채용 가능성을 높입니다.",
+        "use_case": "구인 공고에 맞춰 이력서를 수정하고 키워드를 추천받을 때 사용합니다.",
+        "category": "Service",
+        "tags": [
+          "resume",
+          "ats",
+          "machine-learning",
+          "natural-language-pro"
+        ],
+        "raw_json": "{\n  \"what\": \"이력서를 구인 공고에 맞게 최적화하는 서비스입니다.\",\n  \"why\": \"개발자는 이 도구로 이력서를 개선하여 채용 가능성을 높입니다.\",\n  \"use_case\": \"구인 공고에 맞춰 이력서를 수정하고 키워드를 추천받을 때 사용합니다.\",\n  \"category\": \"Service\",\n  \"tags\": [\"resume\", \"ats\", \"machine-learning\", \"natural-language-processing\"]\n}"
+      },
+      "prompt_version": 2
+    },
+    {
+      "repo": "Arsture/whispree",
+      "input": {
+        "full_name": "Arsture/whispree",
+        "description": "Free, fully local macOS menu bar app for speech-to-text with LLM post-processing. Open-source SuperWhisper alternative for Apple Silicon.",
+        "language": "Swift",
+        "topics": []
+      },
+      "readme_excerpt": "# Whispree\n\n> Start voice-coding with just an OpenAI account. For free.\n\n[한국어](README.ko.md) | English\n\n![License](https://img.shields.io/github/license/Arsture/whispree)\n![Version](https://img.shields.io/github/v/release/Arsture/whispree)\n![Build](https://img.shields.io/github/actions/workflow/status/Arsture/whispree/release.yml)\n![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-blue)\n\n<p align=\"center\">\n  <img src=\"assets/english-demo.png\" alt=\"Whispree English Demo\" width=\"720\">",
+      "prompt": "Given this GitHub repo:\n- Name: Arsture/whispree\n- GitHub description: Free, fully local macOS menu bar app for speech-to-text with LLM post-processing. Open-source SuperWhisper alternative for Apple Silicon.\n- Language: Swift\n- Topics: \n- README excerpt: # Whispree\n\n> Start voice-coding with just an OpenAI account. For free.\n\n[한국어](README.ko.md) | English\n\n![License](https://img.shields.io/github/license/Arsture/whispree)\n![Version](https://img.shields.io/github/v/release/Arsture/whispree)\n![Build](https://img.shields.io/github/actions/workflow/status/Arsture/whispree/release.yml)\n![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-blue)\n\n<p align=\"center\">\n  <img src=\"assets/english-demo.png\" alt=\"Whispree English Demo\" width=\"720\">\n\nWrite the \"what\", \"why\", and \"use_case\" values in Korean. Keep \"category\" and \"tags\" in English.\nRespond ONLY with valid JSON in this exact format:\n{\n  \"what\": \"One sentence: what this repo IS (max 80 chars)\",\n  \"why\": \"One sentence: why a developer would care (max 80 chars)\",\n  \"use_case\": \"One sentence: specific scenario (max 80 chars)\",\n  \"category\": \"One of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other\",\n  \"tags\": [\"tag1\", \"tag2\"]\n}",
+      "llm_result": {
+        "what": "무료 로컬 macOS 메뉴바 음성-텍스트 앱, LLM 후처리 지원",
+        "why": "무료 오픈소스 로컬 음성-텍스트 앱으로 프라이버시 보호 및 사용자 정의 가능",
+        "use_case": "개발자가 음성으로 코드를 입력하고 LLM으로 자동 수정",
+        "category": "Other",
+        "tags": [
+          "speech-to-text",
+          "macos",
+          "open-source",
+          "llm"
+        ],
+        "raw_json": "{\n  \"what\": \"무료 로컬 macOS 메뉴바 음성-텍스트 앱, LLM 후처리 지원\",\n  \"why\": \"무료 오픈소스 로컬 음성-텍스트 앱으로 프라이버시 보호 및 사용자 정의 가능\",\n  \"use_case\": \"개발자가 음성으로 코드를 입력하고 LLM으로 자동 수정\",\n  \"category\": \"Other\",\n  \"tags\": [\"speech-to-text\", \"macos\", \"open-source\", \"llm\", \"voice-coding\"]\n}"
+      },
+      "prompt_version": 2
+    }
+  ],
+  "failed": [
+    {
+      "repo": "raullenchai/Rapid-MLX",
+      "error": "Empty content in response. Full data keys: ['id', 'object', 'created', 'model', 'choices', 'usage', 'system_fingerprint', 'cost']. Choices[0] keys: ['index', 'message', 'logprobs', 'finish_reason']"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "id": "244d17df-0ba5-4b31-9251-5f7d290bda7b",
+  "object": "chat.completion",
+  "created": 1782914331,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"AST 기반 초경량 코드 검색 CLI 도구\",\n  \"why\": \"토큰 사용량을 줄이고 코딩 에이전트 속도를 높이는 AST 기반 코드 검색\",\n  \"use_case\": \"AI 코딩 에이전트가 코드베이스에서 관련 코드를 빠르게 검색하여 컨텍스트를 최적화할 때 사용\",\n  \"category\": \"CLI Tool\",\n  \"tags\": [\"code-search\", \"ast\"]\n}",
+        "reasoning_content": "We are given a GitHub repo: cocoindex-io/cocoindex-code. The description says it's a super light-weight embedded code search engine CLI (AST based). We need to write \"what\", \"why\", \"use_case\" in Korean, and keep \"category\" and \"tags\" in English. The output must be a JSON object with exactly those keys.\n\nFirst, understand the repo: It's a code search tool, AST-based, for coding agents, saving token usage and improving speed. The README says \"AST-based semantic code search that just works\". So \"what\" should describe what the repo is: an AST-based code search CLI tool.\n\n\"why\": why would a developer care? Because it saves token and improves speed for coding agents, or just efficient code search.\n\n\"use_case\": specific scenario: searching code semantically, improving context window for AI coding assistants.\n\n\"category\": It's a CLI tool. The repo name includes \"code search engine CLI\". So \"CLI Tool\".\n\n\"tags\": From the topics, relevant ones: \"code-search\", \"ast\", \"cli\", \"agents\", \"context-engineering\", \"indexing\". But we need to pick up to maybe 3 tags? The format shows [\"tag1\", \"tag2\"], so likely two. But we can include more? The example shows two tags. But the instruction says \"tags\": [\"tag1\", \"tag2\"]. Probably just two or three. I'll pick \"code-search\", \"ast\", \"cli\". But \"cli\" isn't in the topics but it's relevant. Topics include \"agents\", \"ast\", \"claude-code\", \"cocoindex\", \"code-search\", \"codex\", \"coding-agent\", \"context-engineering\", \"context-window\", \"context-window-optimization\", \"indexing\", \"mcp\", \"open-code\", \"python\", \"rust\", \"tree-sitter\". From these, \"code-search\" and \"ast\" are core. \"cli\" might be inferred. I'll use \"code-search\" and \"ast\" as the two tags.\n\nNow write in Korean:\n\nwhat: \"AST 기반의 초경량 임베디드 코드 검색 엔진 CLI 도구\" (that should be within 80 chars? Let's check: \"AST 기반의 초경량 임베디드 코드 검색 엔진 CLI 도구\" counts: Korean letters: each character is roughly 1. I need to count bytes? 80 chars max. Actually, \"AST 기반의 초경량 임베디드 코드 검색 엔진 CLI 도구\" is 27 characters ? Actually: A S T 공간 기 반 의 공간 초 경 량 공간 임 베 디 드 공간 코 드 공간 검 색 공간 엔 진 공간 C L I 공간 도 구 -> that's many. Better make it concise: \"AST 기반 초경량 코드 검색 CLI 도구\" (that is 14 characters). That is fine.\n\nWhy: \"개발자가 코드를 빠르고 정확하게 검색하여 AI 코딩 에이전트의 토큰 사용량을 70% 절약하고 속도를 향상시킬 수 있습니다.\" That's long. Need max 80 chars. So shorter: \"토큰 사용량을 줄이고 코딩 에이전트 속도를 높이는 AST 기반 코드 검색 도구\" (that's about 26 chars). But careful: 80 chars limit includes spaces? Yes. So I'll count: \"토큰 사용량을 줄이고 코딩 에이전트 속도를 높이는 AST 기반 코드 검색 도구\" : 토(1)큰(2) (3)사(4)용(5)량(6)을(7) (8)줄(9)이(10)고(11) (12)코(13)딩(14) (15)에(16)이(17)전(18)트(19) (20)속(21)도(22)를(23) (24)높(25)이(26)는(27) (28)A(29)S(30)T(31) (32)기(33)반(34) (35)코(36)드(37) (38)검(39)색(40) (41)도(42)구(43) -> 43 characters. That's fine.\n\nUse_case: \"AI 코딩 에이전트가 대규모 코드베이스에서 관련 코드를 빠르게 찾아 컨텍스트 윈도우를 최적화할 때 사용\" (count: about 35 chars). Or \"코드 검색을 통해 AI 어시스턴트의 컨텍스트 효율을 극대화\" (that's about 18 chars). I'll do: \"AI 코딩 에이전트가 코드베이스에서 의미적으로 관련된 코드를 검색할 때 사용\" (that's 24 chars). But we need to ensure it's specific.\n\nI'll go with:\n\nwhat: \"AST 기반 초경량 코드 검색 CLI 도구\"\nwhy: \"토큰 사용량을 줄이고 코딩 에이전트 속도를 높이는 AST 기반 코드 검색\"\nuse_case: \"AI 코딩 에이전트가 코드베이스에서 관련 코드를 빠르게 검색하여 컨텍스트를 최적화할 때 사용\"\n\nCategory: \"CLI Tool\"\nTags: [\"code-search\", \"ast\"]\n\nNow output as JSON.\n\nBut note: The response must be ONLY valid JSON object. So I'll output the JSON without any markdown.\n\nLet's double-check the word count constraints: max 80 chars per field. I'll count actual characters for each.\n\nwhat: \"AST 기반 초경량 코드 검색 CLI 도구\" \n- Character count: A(1) S(2) T(3) (space 4) 기(5) 반(6) (space7) 초(8) 경(9) 량(10) (11) 코(12) 드(13) (14) 검(15) 색(16) (17) C(18) L(19) I(20) (21) 도(22) 구(23) -> 23 characters. OK.\n\nwhy: \"토큰 사용량을 줄이고 코딩 에이전트 속도를 높이는 AST 기반 코드 검색\" \n- characters: 토(1)큰(2) (3)사(4)용(5)량(6)을(7) (8)줄(9)이(10)고(11) (12)코(13)딩(14) (15)에(16)이(17)전(18)트(19) (20)속(21)도(22)를(23) (24)높(25)이(26)는(27) (28)A(29)S(30)T(31) (32)기(33)반(34) (35)코(36)드(37) (38)검(39)색(40) -> 40 characters. OK.\n\nuse_case: \"AI 코딩 에이전트가 코드베이스에서 관련 코드를 빠르게 검색하여 컨텍스트를 최적화할 때 사용\"\n- count: A(1)I(2) (3)코(4)딩(5) (6)에(7)이(8)전(9)트(10)가(11) (12)코(13)드(14)베(15)이(16)스(17)에(18)서(19) (20)관(21)련(22) (23)코(24)드(25)를(26) (27)빠(28)르(29)게(30) (31)검(32)색(33)하(34)여(35) (36)컨(37)텍(38)스(39)트(40)를(41) (42)최(43)적(44)화(45)할(46) (47)때(48) (49)사(50)용(51) -> 51 characters. OK.\n\nAll within 80.\n\nNow tags: [\"code-search\", \"ast\"]\n\nCategory: \"CLI Tool\"\n\nI'll output the JSON."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 516,
+    "completion_tokens": 1938,
+    "total_tokens": 2454,
+    "prompt_tokens_details": {
+      "cached_tokens": 512
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1824
+    },
+    "prompt_cache_hit_tokens": 512,
+    "prompt_cache_miss_tokens": 4
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

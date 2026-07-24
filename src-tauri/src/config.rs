@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Config {
@@ -9,21 +9,24 @@ pub struct Config {
     pub onboarded_at: Option<String>,
 }
 
-fn config_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".eunha").join("config.toml")
+pub fn home_dir() -> PathBuf {
+    PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
 }
 
-pub fn read() -> Config {
-    let path = config_path();
+fn config_path_from(home: &Path) -> PathBuf {
+    home.join(".eunha").join("config.toml")
+}
+
+pub fn read_from(home: &Path) -> Config {
+    let path = config_path_from(home);
     let Ok(contents) = fs::read_to_string(&path) else {
         return Config::default();
     };
     toml::from_str(&contents).unwrap_or_default()
 }
 
-pub fn write(config: &Config) -> Result<(), String> {
-    let path = config_path();
+pub fn write_to(home: &Path, config: &Config) -> Result<(), String> {
+    let path = config_path_from(home);
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
@@ -36,6 +39,14 @@ pub fn write(config: &Config) -> Result<(), String> {
         let _ = fs::set_permissions(&path, perms);
     }
     Ok(())
+}
+
+pub fn read() -> Config {
+    read_from(&home_dir())
+}
+
+pub fn write(config: &Config) -> Result<(), String> {
+    write_to(&home_dir(), config)
 }
 
 pub fn get_secret(key: &str) -> Option<String> {
@@ -56,6 +67,8 @@ pub fn set_secret(key: &str, value: &str) -> Result<(), String> {
     }
     write(&config)
 }
+
+
 
 pub fn get_onboarded_at() -> Option<String> {
     read().onboarded_at.filter(|s| !s.is_empty())

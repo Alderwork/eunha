@@ -1,0 +1,33 @@
+{
+  "id": "98aae729-705f-4ed2-ab44-b8a8041d8fff",
+  "object": "chat.completion",
+  "created": 1782914482,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"AI 기반 자동 태깅과 전체 텍스트 검색을 지원하는 셀프 호스팅 북마크 앱\",\n  \"why\": \"데이터를 자체 보관할 수 있고 AI 기능으로 북마크를 효율적으로 관리할 수 있다.\",\n  \"use_case\": \"웹 링크, 노트, 이미지를 수집하고 AI로 자동 분류하여 나중에 검색할 때\",\n  \"category\": \"Service\",\n  \"tags\": [\"bookmark-manager\", \"self-hosted\", \"read-it-later\", \"nextjs\", \"react-native\", \"typescript\"]\n}",
+        "reasoning_content": "We need to generate JSON with what, why, use_case in Korean, category and tags in English. Repo is karakeep-app/karakeep, self-hostable bookmark-everything app with AI tagging and full text search.\n\nWhat: briefly describe what it is. In Korean. Max 80 chars. e.g., \"셀프 호스팅 가능한 북마크 관리 앱\" but that might be too short? Should include AI? Actually the what is \"what this repo IS\". So: \"AI 기반 자동 태깅 및 전체 텍스트 검색이 가능한 셀프 호스팅 북마크 앱\" That's about 50 chars. But keep under 80.\n\nWhy: why a developer would care. e.g., \"자체 호스팅으로 데이터를 제어하고 AI 기능을 활용할 수 있다.\" That's about 40 chars.\n\nUse_case: specific scenario. e.g., \"링크, 노트, 이미지를 북마크하고 AI로 자동 분류하여 검색하고 싶을 때\" That's about 50 chars.\n\nCategory: Service (since it's a self-hostable service). Tags: from topics: bookmark-manager, bookmarks, bookmarks-manager, nextjs, react-native, read-it-later, self-hosted. Also include TypeScript? Tags are from topics and language. But instructions: keep tags in English. Use topic tags plus language maybe. But the output should have tags array. Probably include the topics as tags. But also note that some tags might be duplicates. Pick relevant ones: bookmark-manager, bookmarks, read-it-later, self-hosted, nextjs, react-native, typescript. But let's include the main ones: \"bookmark-manager\", \"self-hosted\", \"read-it-later\", \"nextjs\", \"react-native\", \"typescript\". Up to 5? Not specified. Just keep it concise.\n\nNow format JSON. Make sure to escape characters if needed. Korean text is fine.\n\nLet's write:\n\nwhat: \"AI 기반 자동 태깅과 전체 텍스트 검색을 지원하는 셀프 호스팅 북마크 앱\"\nwhy: \"데이터를 자체 보관할 수 있고 AI 기능으로 북마크를 효율적으로 관리할 수 있다.\"\nuse_case: \"웹 링크, 노트, 이미지를 수집하고 AI로 자동 분류하여 나중에 검색할 때\"\ncategory: \"Service\"\ntags: [\"bookmark-manager\", \"self-hosted\", \"read-it-later\", \"nextjs\", \"react-native\", \"typescript\"]\n\nCheck lengths: what: 49 chars (Korean), why: 41, use_case: 48. All under 80.\n\nNow output JSON only."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 483,
+    "completion_tokens": 737,
+    "total_tokens": 1220,
+    "prompt_tokens_details": {
+      "cached_tokens": 384
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 593
+    },
+    "prompt_cache_hit_tokens": 384,
+    "prompt_cache_miss_tokens": 99
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

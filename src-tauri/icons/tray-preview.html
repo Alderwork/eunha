@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    margin: 0;
+    background: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px;
+    font-family: -apple-system, sans-serif;
+    color: #fff;
+    gap: 32px;
+  }
+  h1 { font-size: 11px; color: #555; margin: 0; letter-spacing: 0.12em; text-transform: uppercase; }
+  .row { display: flex; gap: 40px; align-items: flex-end; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .label { font-size: 10px; color: #555; }
+  .name { font-size: 11px; color: #888; font-weight: 600; }
+  .menubar {
+    background: #2c2c2c; border-radius: 5px;
+    padding: 3px 8px; display: flex; align-items: center; gap: 5px;
+  }
+  .menubar-light {
+    background: #e0e0e0; border-radius: 5px;
+    padding: 3px 8px; display: flex; align-items: center; gap: 5px;
+  }
+  .menubar svg { fill: white; }
+  .menubar-light svg { fill: black; }
+  .ml { font-size: 9px; color: #555; }
+  .mll { font-size: 9px; color: #aaa; }
+  .divider { width: 1px; height: 80px; background: #2a2a2a; }
+</style>
+</head>
+<body>
+
+<h1>A-1 — inner shifted right + up (matches original orb highlight)</h1>
+
+<!-- The chosen path: outer circle center (9,9) r=8, inner circle center (11, 7.5) r=5.5 -->
+<!-- inner shifted +2 right, -1.5 up from center — crescent opens lower-left -->
+
+<div class="row">
+  <!-- 72px -->
+  <div class="col">
+    <div class="name">72px</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="72" height="72">
+      <path fill="black" fill-rule="evenodd"
+        d="M9 1a8 8 0 1 0 0 16A8 8 0 0 0 9 1z
+           M11 2a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 11 2z"/>
+    </svg>
+  </div>
+
+  <!-- 36px -->
+  <div class="col">
+    <div class="name">36px</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="36" height="36">
+      <path fill="black" fill-rule="evenodd"
+        d="M9 1a8 8 0 1 0 0 16A8 8 0 0 0 9 1z
+           M11 2a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 11 2z"/>
+    </svg>
+  </div>
+
+  <!-- 18px -->
+  <div class="col">
+    <div class="name">18px</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18">
+      <path fill="black" fill-rule="evenodd"
+        d="M9 1a8 8 0 1 0 0 16A8 8 0 0 0 9 1z
+           M11 2a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 11 2z"/>
+    </svg>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- menu bar dark -->
+  <div class="col">
+    <div class="name">menu bar</div>
+    <div class="menubar">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="16" height="16">
+        <path fill-rule="evenodd"
+          d="M9 1a8 8 0 1 0 0 16A8 8 0 0 0 9 1z
+             M11 2a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 11 2z"/>
+      </svg>
+      <span class="ml">eunha</span>
+      <span class="ml" style="color:#3a3a3a;">▾</span>
+    </div>
+    <div class="menubar-light">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="16" height="16">
+        <path fill-rule="evenodd"
+          d="M9 1a8 8 0 1 0 0 16A8 8 0 0 0 9 1z
+             M11 2a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 11 2z"/>
+      </svg>
+      <span class="mll">eunha</span>
+      <span class="mll" style="color:#bbb;">▾</span>
+    </div>
+  </div>
+
+  <!-- side by side with original icon -->
+  <div class="divider"></div>
+  <div class="col">
+    <div class="name">오리지널 로고</div>
+    <img src="icon.png" width="72" height="72" style="border-radius:16px;"/>
+  </div>
+
+</div>
+
+</body>
+</html>

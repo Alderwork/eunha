@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Provider } from '../types';
+import {
+  ConduitProvider,
+  ConnectDialog,
+  ConnectionCard,
+  ModelSelector,
+  useConnections,
+} from '@conduit/react';
+import { conduit } from '../lib/conduit';
 import { Button } from './ui/Button';
 import { Kbd } from './ui/Kbd';
 
@@ -9,6 +16,12 @@ interface ImportDbResult {
   repos_skipped: number;
   releases_added: number;
   error: string | null;
+}
+
+interface SyncStarsResult {
+  added: number;
+  removed: number;
+  removed_names: string[];
 }
 
 const LANGUAGES = [
@@ -56,15 +69,14 @@ export function SettingsView({ onBack }: Props) {
   const [section, setSection] = useState<Section>('app');
 
   const [pat, setPat] = useState('');
-  const [provider, setProvider] = useState<Provider>('openai');
-  const [apiKey, setApiKey] = useState('');
-  const [ollamaUrl, setOllamaUrl] = useState('http://localhost:11434');
-  const [ollamaModel, setOllamaModel] = useState('llama3');
   const [outputLanguage, setOutputLanguage] = useState('English');
   const [defaultReleasePlatform, setDefaultReleasePlatform] = useState<string>('');
   const [showTrayIcon, setShowTrayIcon] = useState(true);
+  const [starSyncInterval, setStarSyncInterval] = useState('360');
+  const [lastStarSyncAt, setLastStarSyncAt] = useState<string | null>(null);
+  const [syncingStars, setSyncingStars] = useState(false);
+  const [starSyncMsg, setStarSyncMsg] = useState<{ text: string; error: boolean } | null>(null);
   const [patMasked, setPatMasked] = useState('');
-  const [apiKeyMasked, setApiKeyMasked] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,28 +91,44 @@ export function SettingsView({ onBack }: Props) {
     invoke<{
       pat_set: boolean;
       pat_masked: string;
-      provider: string;
-      api_key_set: boolean;
-      api_key_masked: string;
-      ollama_url: string;
-      ollama_model: string;
       output_language: string;
       default_release_platform?: string;
       show_tray_icon: boolean;
+      star_sync_interval_minutes?: string;
+      last_star_sync_at?: string | null;
     }>('get_settings')
       .then((s) => {
         setPatMasked(s.pat_masked);
-        setApiKeyMasked(s.api_key_masked);
-        setProvider(s.provider as Provider);
-        setOllamaUrl(s.ollama_url);
-        setOllamaModel(s.ollama_model);
         setOutputLanguage(s.output_language);
         setDefaultReleasePlatform(s.default_release_platform ?? '');
         setShowTrayIcon(s.show_tray_icon);
+        setStarSyncInterval(s.star_sync_interval_minutes ?? '360');
+        setLastStarSyncAt(s.last_star_sync_at ?? null);
       })
       .catch((e) => setError(`Failed to load settings: ${e}`))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleSyncNow() {
+    if (syncingStars) return;
+    setSyncingStars(true);
+    setStarSyncMsg(null);
+    try {
+      const r = await invoke<SyncStarsResult>('sync_stars');
+      setLastStarSyncAt(new Date().toISOString());
+      setStarSyncMsg({
+        text:
+          r.added === 0 && r.removed === 0
+            ? 'Up to date — no changes.'
+            : `Done: ${r.added} added, ${r.removed} removed`,
+        error: false,
+      });
+    } catch (e) {
+      setStarSyncMsg({ text: String(e), error: true });
+    } finally {
+      setSyncingStars(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -108,12 +136,8 @@ export function SettingsView({ onBack }: Props) {
     try {
       const result = await invoke<{ keychain_error: string | null }>('save_settings', {
         githubPat: pat || undefined,
-        llmProvider: provider,
-        llmApiKey: apiKey || undefined,
-        ollamaUrl: provider === 'ollama' ? ollamaUrl : undefined,
-        ollamaModel: provider === 'ollama' ? ollamaModel : undefined,
         outputLanguage: outputLanguage,
-        defaultReleasePlatform: defaultReleasePlatform || null,
+        starSyncIntervalMinutes: starSyncInterval,
       });
       if (result.keychain_error) {
         setError(result.keychain_error);
@@ -288,73 +312,64 @@ export function SettingsView({ onBack }: Props) {
                         </p>
                       )}
                     </Field>
+
+                    <Field label="Star sync">
+                      <select
+                        value={starSyncInterval}
+                        onChange={(e) => setStarSyncInterval(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="0">Off</option>
+                        <option value="60">Every hour</option>
+                        <option value="360">Every 6 hours</option>
+                        <option value="1440">Every 24 hours</option>
+                      </select>
+                      <p className="text-xs text-muted mt-1.5">
+                        Periodically mirrors your GitHub star list — new stars are added,
+                        unstarred repos are removed (manual repos are kept).
+                        {lastStarSyncAt && (
+                          <> Last synced {new Date(lastStarSyncAt).toLocaleString()}.</>
+                        )}
+                      </p>
+                    </Field>
+
+                    <div>
+                      <div className="flex items-start gap-3">
+                        <Button
+                          variant="ghost"
+                          onClick={handleSyncNow}
+                          disabled={syncingStars}
+                          className="text-sm shrink-0"
+                        >
+                          {syncingStars ? 'Syncing…' : 'Sync now'}
+                        </Button>
+                        <p className="text-xs text-muted pt-1.5">
+                          Runs a one-off sync against your GitHub star list.
+                        </p>
+                      </div>
+                      {starSyncMsg && (
+                        <div
+                          className={`text-sm rounded px-3 py-2 mt-3 border ${
+                            starSyncMsg.error
+                              ? 'text-danger bg-danger-tint border-danger/30'
+                              : 'text-success bg-success-tint border-success/30'
+                          }`}
+                        >
+                          {starSyncMsg.text}
+                        </div>
+                      )}
+                    </div>
                   </SectionShell>
                 )}
 
                 {section === 'ai' && (
                   <SectionShell
                     title="AI"
-                    description="Choose a provider and the language used for AI summaries."
+                    description="Connect an AI provider and choose the model used for descriptions."
                   >
-                    <Field label="Provider">
-                      <div className="flex gap-2">
-                        {(['openai', 'anthropic', 'ollama'] as Provider[]).map((p) => (
-                          <button
-                            key={p}
-                            onClick={() => setProvider(p)}
-                            className={`px-3 py-1.5 rounded text-sm border transition-colors capitalize ${
-                              provider === p
-                                ? 'border-brand text-accent bg-brand-tint'
-                                : 'border-border text-muted hover:border-dim'
-                            }`}
-                          >
-                            {p}
-                          </button>
-                        ))}
-                      </div>
-                    </Field>
-
-                    {provider !== 'ollama' && (
-                      <Field label="API Key">
-                        <input
-                          type="password"
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          placeholder={apiKeyMasked || (provider === 'openai' ? 'sk-…' : 'sk-ant-…')}
-                          className={inputCls}
-                        />
-                        {apiKeyMasked && (
-                          <p className="text-xs text-success mt-1.5">
-                            Saved: {apiKeyMasked} — leave blank to keep current
-                          </p>
-                        )}
-                      </Field>
-                    )}
-
-                    {provider === 'ollama' && (
-                      <>
-                        <Field label="Base URL">
-                          <input
-                            type="text"
-                            value={ollamaUrl}
-                            onChange={(e) => setOllamaUrl(e.target.value)}
-                            className={inputCls}
-                          />
-                        </Field>
-                        <Field label="Model">
-                          <input
-                            type="text"
-                            value={ollamaModel}
-                            onChange={(e) => setOllamaModel(e.target.value)}
-                            placeholder="llama3"
-                            className={inputCls}
-                          />
-                          <p className="text-xs text-muted mt-1.5">
-                            Must be pulled locally, e.g. <code>ollama pull llama3.2</code>
-                          </p>
-                        </Field>
-                      </>
-                    )}
+                    <ConduitProvider conduit={conduit}>
+                      <AiConnections />
+                    </ConduitProvider>
 
                     <Field label="Description language">
                       <select
@@ -510,6 +525,48 @@ function SectionShell({
       <h2 className="text-lg font-semibold text-ink">{title}</h2>
       <p className="text-sm text-muted mt-1 mb-6">{description}</p>
       <div className="space-y-5">{children}</div>
+    </div>
+  );
+}
+
+/** Connection management for the AI section, backed by Conduit. */
+function AiConnections() {
+  const { connections, activeId } = useConnections();
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      <Field label="Connections">
+        {connections === null ? (
+          <p className="text-sm text-muted">Loading…</p>
+        ) : connections.length === 0 ? (
+          <p className="text-sm text-muted">
+            No provider connected yet. Connect one to enable AI descriptions.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {connections.map((c) => (
+              <ConnectionCard key={c.id} connection={c} active={c.id === activeId} />
+            ))}
+          </div>
+        )}
+        <div className="mt-3">
+          <Button variant="ghost" onClick={() => setDialogOpen(true)} className="text-sm">
+            Connect provider
+          </Button>
+        </div>
+      </Field>
+
+      {activeId && (
+        <Field label="Default model">
+          <ModelSelector connectionId={activeId} />
+        </Field>
+      )}
+
+      <ConnectDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+      />
     </div>
   );
 }

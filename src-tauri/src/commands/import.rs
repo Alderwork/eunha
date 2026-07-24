@@ -11,7 +11,7 @@ struct GithubOwner {
 }
 
 #[derive(Debug, serde::Deserialize)]
-struct GithubRepo {
+pub(crate) struct GithubRepo {
     full_name: String,
     html_url: String,
     description: Option<String>,
@@ -21,7 +21,7 @@ struct GithubRepo {
     owner: Option<GithubOwner>,
 }
 
-async fn fetch_page(
+pub(crate) async fn fetch_page(
     client: &reqwest::Client,
     pat: &str,
     page: u32,
@@ -89,39 +89,123 @@ fn parse_last_page(link: &str) -> Option<u32> {
     None
 }
 
+/// INSERT OR IGNORE one repo as source='starred'. Returns true if inserted.
+fn insert_repo(tx: &rusqlite::Transaction, repo: &GithubRepo) -> rusqlite::Result<bool> {
+    let topics_json = repo
+        .topics
+        .as_ref()
+        .map(|t| serde_json::to_string(t).unwrap_or_default())
+        .unwrap_or_default();
+
+    let owner_avatar_url = repo.owner.as_ref().and_then(|o| o.avatar_url.clone());
+    let affected = tx.execute(
+        "INSERT OR IGNORE INTO repos (id, full_name, description, url, language, stars_count, topics, source, owner_avatar_url)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'starred', ?8)",
+        params![
+            repo.full_name,
+            repo.full_name,
+            repo.description,
+            repo.html_url,
+            repo.language,
+            repo.stargazers_count,
+            topics_json,
+            owner_avatar_url,
+        ],
+    )?;
+
+    Ok(affected > 0)
+}
+
 fn save_page(conn: &rusqlite::Connection, repos: &[GithubRepo]) -> rusqlite::Result<(u32, u32)> {
     let tx = conn.unchecked_transaction()?;
     let mut inserted = 0u32;
     let mut skipped = 0u32;
 
     for repo in repos {
-        let topics_json = repo
-            .topics
-            .as_ref()
-            .map(|t| serde_json::to_string(t).unwrap_or_default())
-            .unwrap_or_default();
-
-        let owner_avatar_url = repo.owner.as_ref().and_then(|o| o.avatar_url.clone());
-        let affected = tx.execute(
-            "INSERT OR IGNORE INTO repos (id, full_name, description, url, language, stars_count, topics, source, owner_avatar_url)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'starred', ?8)",
-            params![
-                repo.full_name,
-                repo.full_name,
-                repo.description,
-                repo.html_url,
-                repo.language,
-                repo.stargazers_count,
-                topics_json,
-                owner_avatar_url,
-            ],
-        )?;
-
-        if affected > 0 { inserted += 1; } else { skipped += 1; }
+        if insert_repo(&tx, repo)? {
+            inserted += 1;
+        } else {
+            skipped += 1;
+        }
     }
 
     tx.commit()?;
     Ok((inserted, skipped))
+}
+
+pub(crate) struct StarSyncOutcome {
+    pub(crate) added: u32,
+    pub(crate) removed: u32,
+    pub(crate) removed_names: Vec<String>,
+}
+
+/// Mirror the library against the complete fetched star list, atomically:
+/// insert new starred repos, delete starred-source repos that are no longer
+/// starred (manual-source repos are never touched). Caller MUST pass the full
+/// list — a partial fetch would delete legitimate rows.
+///
+/// FK cascades are not enforced (no PRAGMA foreign_keys), so dependent rows in
+/// releases/release_assets/digest_items/collection_items/repo_engagement are
+/// deleted explicitly.
+pub(crate) fn apply_star_sync(
+    conn: &rusqlite::Connection,
+    repos: &[GithubRepo],
+) -> rusqlite::Result<StarSyncOutcome> {
+    let tx = conn.unchecked_transaction()?;
+
+    tx.execute_batch(
+        "CREATE TEMP TABLE IF NOT EXISTS star_sync_ids (id TEXT PRIMARY KEY);
+         DELETE FROM star_sync_ids;
+         CREATE TEMP TABLE IF NOT EXISTS star_sync_stale (id TEXT PRIMARY KEY);
+         DELETE FROM star_sync_stale;",
+    )?;
+
+    let mut added = 0u32;
+    {
+        let mut id_stmt = tx.prepare("INSERT OR IGNORE INTO star_sync_ids (id) VALUES (?1)")?;
+        for repo in repos {
+            id_stmt.execute(params![repo.full_name])?;
+            if insert_repo(&tx, repo)? {
+                added += 1;
+            }
+        }
+    }
+
+    tx.execute(
+        "INSERT INTO star_sync_stale
+         SELECT id FROM repos WHERE source = 'starred' AND id NOT IN (SELECT id FROM star_sync_ids)",
+        [],
+    )?;
+
+    let removed_names: Vec<String> = {
+        let mut stmt = tx.prepare("SELECT id FROM star_sync_stale ORDER BY id")?;
+        let names = stmt
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        names
+    };
+    let removed = removed_names.len() as u32;
+
+    if removed > 0 {
+        tx.execute_batch(
+            "DELETE FROM release_assets WHERE release_id IN
+                 (SELECT id FROM releases WHERE repo_id IN (SELECT id FROM star_sync_stale));
+             DELETE FROM releases WHERE repo_id IN (SELECT id FROM star_sync_stale);
+             DELETE FROM digest_items WHERE repo_id IN (SELECT id FROM star_sync_stale);
+             DELETE FROM collection_items WHERE repo_id IN (SELECT id FROM star_sync_stale);
+             DELETE FROM repo_engagement WHERE repo_id IN (SELECT id FROM star_sync_stale);
+             DELETE FROM repos WHERE id IN (SELECT id FROM star_sync_stale);",
+        )?;
+    }
+
+    tx.execute_batch("DROP TABLE star_sync_ids; DROP TABLE star_sync_stale;")?;
+    tx.commit()?;
+
+    Ok(StarSyncOutcome {
+        added,
+        removed,
+        removed_names,
+    })
 }
 
 pub struct CancelState(pub Arc<AtomicBool>);
@@ -226,4 +310,95 @@ pub async fn import_stars(
 #[tauri::command]
 pub fn cancel_import(cancel: State<'_, CancelState>) {
     cancel.0.store(true, Ordering::SeqCst);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn test_conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        crate::db::migrations::run(&conn).unwrap();
+        conn
+    }
+
+    fn gh(full_name: &str) -> GithubRepo {
+        GithubRepo {
+            full_name: full_name.to_string(),
+            html_url: format!("https://github.com/{full_name}"),
+            description: None,
+            language: None,
+            stargazers_count: None,
+            topics: None,
+            owner: None,
+        }
+    }
+
+    fn repo_ids(conn: &Connection) -> Vec<String> {
+        let mut stmt = conn.prepare("SELECT id FROM repos ORDER BY id").unwrap();
+        stmt.query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn sync_adds_new_removes_unstarred_keeps_manual() {
+        let conn = test_conn();
+        apply_star_sync(&conn, &[gh("a/1"), gh("b/2")]).unwrap();
+        conn.execute(
+            "INSERT INTO repos (id, full_name, url, source) VALUES ('m/1', 'm/1', 'u', 'manual')",
+            [],
+        )
+        .unwrap();
+
+        let outcome = apply_star_sync(&conn, &[gh("b/2"), gh("c/3")]).unwrap();
+
+        assert_eq!(outcome.added, 1);
+        assert_eq!(outcome.removed, 1);
+        assert_eq!(outcome.removed_names, vec!["a/1".to_string()]);
+        assert_eq!(repo_ids(&conn), vec!["b/2", "c/3", "m/1"]);
+    }
+
+    #[test]
+    fn sync_is_noop_when_list_matches() {
+        let conn = test_conn();
+        apply_star_sync(&conn, &[gh("a/1")]).unwrap();
+        let outcome = apply_star_sync(&conn, &[gh("a/1")]).unwrap();
+        assert_eq!(outcome.added, 0);
+        assert_eq!(outcome.removed, 0);
+        assert_eq!(repo_ids(&conn), vec!["a/1"]);
+    }
+
+    #[test]
+    fn sync_removes_dependent_rows() {
+        let conn = test_conn();
+        apply_star_sync(&conn, &[gh("a/1")]).unwrap();
+        conn.execute_batch(
+            "INSERT INTO releases (id, repo_id, tag_name, html_url, published_at) VALUES ('a/1#v1', 'a/1', 'v1', 'u', 'now');
+             INSERT INTO release_assets (release_id, name, download_url) VALUES ('a/1#v1', 'f.zip', 'u');
+             INSERT INTO repo_engagement (repo_id, event_type) VALUES ('a/1', 'open_browser');
+             INSERT INTO digest_items (repo_id, batch_date, reason) VALUES ('a/1', '2026-01-01', 'forgotten');
+             INSERT INTO collections (name) VALUES ('c');
+             INSERT INTO collection_items (collection_id, repo_id) VALUES (1, 'a/1');",
+        )
+        .unwrap();
+
+        // Unstarred everything.
+        let outcome = apply_star_sync(&conn, &[]).unwrap();
+        assert_eq!(outcome.removed, 1);
+
+        let count = |sql: &str| -> i64 { conn.query_row(sql, [], |r| r.get(0)).unwrap() };
+        assert_eq!(count("SELECT COUNT(*) FROM repos"), 0);
+        assert_eq!(count("SELECT COUNT(*) FROM releases"), 0);
+        assert_eq!(count("SELECT COUNT(*) FROM release_assets"), 0);
+        assert_eq!(count("SELECT COUNT(*) FROM repo_engagement"), 0);
+        assert_eq!(count("SELECT COUNT(*) FROM digest_items"), 0);
+        assert_eq!(count("SELECT COUNT(*) FROM collection_items"), 0);
+        // FTS index must not retain stale entries for the deleted repo.
+        assert_eq!(count("SELECT COUNT(*) FROM repos_fts"), 0);
+        // The collection itself survives — only its membership row is gone.
+        assert_eq!(count("SELECT COUNT(*) FROM collections"), 1);
+    }
 }

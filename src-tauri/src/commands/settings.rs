@@ -18,14 +18,13 @@ fn mask_secret(s: &str) -> String {
     format!("{}{}", dots, tail)
 }
 
+/// LLM provider/key/model settings are owned by Conduit connections
+/// (`crate::conduit`) — this command only handles app-level settings.
 #[tauri::command]
 pub fn save_settings(
     github_pat: Option<String>,
-    llm_provider: Option<String>,
-    llm_api_key: Option<String>,
-    ollama_url: Option<String>,
-    ollama_model: Option<String>,
     output_language: Option<String>,
+    star_sync_interval_minutes: Option<String>,
     state: State<'_, DbState>,
     _app: AppHandle,
 ) -> Result<serde_json::Value, String> {
@@ -36,27 +35,14 @@ pub fn save_settings(
             config_error = Some(format!("Config error (PAT): {e}"));
         }
     }
-    if let Some(key) = llm_api_key {
-        if let Err(e) = crate::config::set_secret("llm_api_key", &key) {
-            config_error = Some(format!("Config error (API key): {e}"));
-        }
-    }
 
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(provider) = llm_provider {
-        migrations::settings_set(&conn, "llm_provider", &provider)
-            .map_err(|e| e.to_string())?;
-    }
-    if let Some(url) = ollama_url {
-        migrations::settings_set(&conn, "ollama_url", &url)
-            .map_err(|e| e.to_string())?;
-    }
-    if let Some(model) = ollama_model {
-        migrations::settings_set(&conn, "ollama_model", &model)
-            .map_err(|e| e.to_string())?;
-    }
     if let Some(lang) = output_language {
         migrations::settings_set(&conn, "output_language", &lang)
+            .map_err(|e| e.to_string())?;
+    }
+    if let Some(interval) = star_sync_interval_minutes {
+        migrations::settings_set(&conn, "star_sync_interval_minutes", &interval)
             .map_err(|e| e.to_string())?;
     }
 
@@ -69,31 +55,24 @@ pub fn get_settings(
     _app: AppHandle,
 ) -> Result<serde_json::Value, String> {
     let pat = get_secret("github_pat").unwrap_or_default();
-    let api_key = get_secret("llm_api_key").unwrap_or_default();
 
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    let provider = migrations::settings_get(&conn, "llm_provider")
-        .unwrap_or_else(|| "openai".to_string());
-    let ollama_url = migrations::settings_get(&conn, "ollama_url")
-        .unwrap_or_else(|| "http://localhost:11434".to_string());
-    let ollama_model = migrations::settings_get(&conn, "ollama_model")
-        .unwrap_or_else(|| "llama3".to_string());
     let output_language = migrations::settings_get(&conn, "output_language")
         .unwrap_or_else(|| "English".to_string());
     let show_tray_icon = migrations::settings_get(&conn, "show_tray_icon")
         .map(|v| v != "false")
         .unwrap_or(true);
+    let star_sync_interval_minutes = migrations::settings_get(&conn, "star_sync_interval_minutes")
+        .unwrap_or_else(|| crate::commands::sync::DEFAULT_SYNC_INTERVAL_MINUTES.to_string());
+    let last_star_sync_at = migrations::settings_get(&conn, "last_star_sync_at");
 
     Ok(serde_json::json!({
         "pat_set": !pat.is_empty(),
         "pat_masked": mask_secret(&pat),
-        "provider": provider,
-        "api_key_set": !api_key.is_empty(),
-        "api_key_masked": mask_secret(&api_key),
-        "ollama_url": ollama_url,
-        "ollama_model": ollama_model,
         "output_language": output_language,
         "show_tray_icon": show_tray_icon,
+        "star_sync_interval_minutes": star_sync_interval_minutes,
+        "last_star_sync_at": last_star_sync_at,
     }))
 }
 

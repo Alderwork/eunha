@@ -142,7 +142,7 @@ fn try_fts_search(
                 repos.user_notes, repos.user_category, repos.watching, repos.category_locked
          FROM repos JOIN repos_fts ON repos.rowid = repos_fts.rowid
          WHERE repos_fts MATCH ?1{extra_and}
-         ORDER BY repos.full_name ASC"
+         ORDER BY rank"
     );
     let mut stmt = conn.prepare(&sql)?;
     let repos: Vec<Repo> = stmt

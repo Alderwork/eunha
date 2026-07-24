@@ -1,0 +1,33 @@
+{
+  "id": "088275cb-aa2a-47fd-b651-7f66a5281c55",
+  "object": "chat.completion",
+  "created": 1782914517,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"NotebookLM MCP 서버로, AI 에이전트가 구글 노트북LM을 통해 문서를 검색하고 인용된 답변을 제공합니다.\",\n  \"why\": \"개발자는 이를 통해 AI 에이전트에 신뢰할 수 있는 문서 검색 및 인용 기능을 추가할 수 있습니다.\",\n  \"use_case\": \"Claude Code나 Codex 같은 AI 에이전트가 프로젝트 문서를 직접 검색하고 인용된 답변을 얻는 시나리오.\",\n  \"category\": \"Service\",\n  \"tags\": [\"MCP\", \"NotebookLM\", \"TypeScript\", \"Gemini\", \"Documentation Search\"]\n}",
+        "reasoning_content": "We need to output JSON with fields: what, why, use_case in Korean, category and tags in English. The repo is \"PleasePrompto/notebooklm-mcp\". It provides an MCP server for NotebookLM, allowing AI agents to research documentation with grounded answers from Gemini. It uses Patchright for stealth and persistence.\n\nGenerate concise Korean sentences (max 80 chars each) for what, why, use_case.\n\n- what: MCP 서버로, AI 에이전트가 NotebookLM을 통해 문서를 검색하고 인용된 답변을 제공합니다.\n- why: 개발자는 이를 통해 AI 에이전트에 신뢰할 수 있는 문서 검색 기능을 추가할 수 있습니다.\n- use_case: Claude Code와 같은 AI 에이전트가 프로젝트 문서를 직접 검색하고 인용된 답변을 얻는 시나리오.\n\nCategory: Given it's an MCP server, likely \"Service\" (since it's a server/service). But could also be \"Library\"? It's a server that provides MCP protocol. The description says \"MCP server\". So \"Service\" seems appropriate.\n\nTags: Based on topics, but topics are empty. From description: TypeScript, MCP, NotebookLM, Patchright, Gemini. I'll pick relevant tags like \"MCP\", \"NotebookLM\", \"TypeScript\", \"Gemini\", \"Documentation Search\".\n\nMake sure JSON is valid and only output JSON."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 465,
+    "completion_tokens": 465,
+    "total_tokens": 930,
+    "prompt_tokens_details": {
+      "cached_tokens": 384
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 308
+    },
+    "prompt_cache_hit_tokens": 384,
+    "prompt_cache_miss_tokens": 81
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

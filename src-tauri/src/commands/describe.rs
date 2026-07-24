@@ -6,6 +6,61 @@ use tauri::{Emitter, State};
 
 pub const CURRENT_PROMPT_VERSION: u32 = 1;
 
+const DEFAULT_OPENAI_MODEL: &str = "gpt-4o-mini";
+const DEFAULT_ANTHROPIC_MODEL: &str = "claude-haiku-4-5-20251001";
+pub const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
+pub const DEFAULT_OLLAMA_MODEL: &str = "llama3";
+pub const DEFAULT_OPENCODE_GO_MODEL: &str = "deepseek-v4-flash";
+const DEFAULT_LMSTUDIO_URL: &str = "http://127.0.0.1:1234/v1";
+
+/// OpenAI-compatible chat-completions endpoint for every provider that
+/// speaks that shape. Mirror of the @conduit/core presets (which only
+/// declare the models endpoint); anthropic/ollama/azure-foundry/lmstudio
+/// are handled separately in `call_llm`.
+fn chat_completions_url(provider: &str) -> Option<&'static str> {
+    Some(match provider {
+        "openai" => "https://api.openai.com/v1/chat/completions",
+        "opencode-go" => "https://opencode.ai/zen/go/v1/chat/completions",
+        "opencode" => "https://opencode.ai/zen/v1/chat/completions",
+        "gemini" => "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        "openrouter" => "https://openrouter.ai/api/v1/chat/completions",
+        "deepseek" => "https://api.deepseek.com/chat/completions",
+        "xai" => "https://api.x.ai/v1/chat/completions",
+        "qwen" => "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+        "qwen-cn" => "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        "zai" => "https://api.z.ai/api/paas/v4/chat/completions",
+        "moonshot" => "https://api.moonshot.ai/v1/chat/completions",
+        "moonshot-cn" => "https://api.moonshot.cn/v1/chat/completions",
+        "minimax" => "https://api.minimax.io/v1/chat/completions",
+        "minimax-cn" => "https://api.minimaxi.com/v1/chat/completions",
+        "stepfun" => "https://api.stepfun.com/step_plan/v1/chat/completions",
+        "xiaomi" => "https://api.xiaomimimo.com/v1/chat/completions",
+        "upstage" => "https://api.upstage.ai/v1/chat/completions",
+        "arcee" => "https://api.arcee.ai/v1/chat/completions",
+        "nvidia" => "https://integrate.api.nvidia.com/v1/chat/completions",
+        "huggingface" => "https://router.huggingface.co/v1/chat/completions",
+        "fireworks" => "https://api.fireworks.ai/inference/v1/chat/completions",
+        "deepinfra" => "https://api.deepinfra.com/v1/openai/chat/completions",
+        "novita" => "https://api.novita.ai/openai/chat/completions",
+        "gmi-cloud" => "https://api.gmi-serving.com/v1/chat/completions",
+        "ollama-cloud" => "https://ollama.com/v1/chat/completions",
+        "kilo" => "https://api.kilo.ai/api/gateway/chat/completions",
+        "nous-portal" => "https://inference-api.nousresearch.com/v1/chat/completions",
+        "tencent-tokenhub" => "https://tokenhub.tencentmaas.com/v1/chat/completions",
+        "github-copilot" => "https://api.githubcopilot.com/chat/completions",
+        _ => return None,
+    })
+}
+
+/// How an OpenAI-compatible provider expects its credential.
+#[derive(Clone, Copy)]
+enum CompatibleAuth {
+    /// `Authorization: Bearer <key>` (header skipped when the key is empty).
+    Bearer,
+    /// `api-key: <key>` — Azure OpenAI style.
+    ApiKeyHeader,
+}
+
 const VALID_CATEGORIES: &[&str] = &[
     "CLI Tool",
     "Library",
@@ -110,47 +165,111 @@ async fn fetch_readme(full_name: &str, pat: &str) -> Option<String> {
     }
 }
 
-async fn call_llm(
+/// Shared caller for OpenAI-compatible chat-completions APIs (OpenAI,
+/// DeepSeek, xAI, Qwen, OpenCode, ...). `response_format: json_object` is
+/// not supported by every compatible provider — try with it, retry
+/// without on a 400.
+async fn call_openai_compatible(
     prompt: &str,
-    provider: &str,
+    url: &str,
     api_key: &str,
-    ollama_url: Option<&str>,
-    model: Option<&str>,
+    model: &str,
+    error_label: &str,
+    auth: CompatibleAuth,
 ) -> Result<String, String> {
     let client = reqwest::Client::new();
+    // Roomier than the old 500: reasoning models burn tokens before content.
+    for json_mode in [true, false] {
+        let mut body = serde_json::json!({
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1500
+        });
+        if json_mode {
+            body["response_format"] = serde_json::json!({"type": "json_object"});
+        }
+        let mut req = client.post(url).json(&body);
+        if !api_key.is_empty() {
+            req = match auth {
+                CompatibleAuth::Bearer => {
+                    req.header("Authorization", format!("Bearer {api_key}"))
+                }
+                CompatibleAuth::ApiKeyHeader => req.header("api-key", api_key),
+            };
+        }
+        let resp = req
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {e}"))?;
 
-    match provider {
-        "openai" => {
-            let body = serde_json::json!({
-                "model": "gpt-4o-mini",
-                "messages": [{"role": "user", "content": prompt}],
-                "response_format": {"type": "json_object"},
-                "max_tokens": 500
-            });
-            let resp = client
-                .post("https://api.openai.com/v1/chat/completions")
-                .header("Authorization", format!("Bearer {}", api_key))
-                .json(&body)
-                .send()
-                .await
-                .map_err(|e| format!("Request failed: {e}"))?;
+        if resp.status().as_u16() == 400 && json_mode {
+            continue; // provider rejected response_format — retry plain
+        }
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("{error_label} error {status}: {text}"));
+        }
 
-            if !resp.status().is_success() {
-                let status = resp.status();
-                let text = resp.text().await.unwrap_or_default();
-                return Err(format!("OpenAI error {status}: {text}"));
-            }
+        let json: serde_json::Value =
+            resp.json().await.map_err(|e| format!("Parse error: {e}"))?;
+        return json["choices"][0]["message"]["content"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or("No content in response".to_string());
+    }
+    unreachable!("the second attempt always returns")
+}
 
-            let json: serde_json::Value =
-                resp.json().await.map_err(|e| format!("Parse error: {e}"))?;
-            json["choices"][0]["message"]["content"]
-                .as_str()
-                .map(|s| s.to_string())
-                .ok_or("No content in response".to_string())
+fn require_model<'a>(model: Option<&'a str>, provider: &str) -> Result<&'a str, String> {
+    model
+        .filter(|m| !m.is_empty())
+        .ok_or_else(|| format!("No model selected for {provider}. Open Settings (,) and pick a default model."))
+}
+
+async fn call_llm(prompt: &str, settings: &LlmSettings) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let api_key = settings.api_key.as_str();
+    let model = settings.model.as_deref().filter(|m| !m.is_empty());
+
+    match settings.provider.as_str() {
+        "azure-foundry" => {
+            let endpoint = settings
+                .meta
+                .get("endpoint")
+                .map(|e| e.trim().trim_end_matches('/'))
+                .filter(|e| !e.is_empty())
+                .ok_or("Azure Foundry needs an endpoint URL. Set it in Settings.")?;
+            call_openai_compatible(
+                prompt,
+                &format!("{endpoint}/chat/completions"),
+                api_key,
+                require_model(model, "azure-foundry")?,
+                "Azure Foundry",
+                CompatibleAuth::ApiKeyHeader,
+            )
+            .await
+        }
+        "lmstudio" => {
+            let base = settings
+                .meta
+                .get("base_url")
+                .map(|u| u.trim().trim_end_matches('/'))
+                .filter(|u| !u.is_empty())
+                .unwrap_or(DEFAULT_LMSTUDIO_URL);
+            call_openai_compatible(
+                prompt,
+                &format!("{base}/chat/completions"),
+                api_key,
+                require_model(model, "lmstudio")?,
+                "LM Studio",
+                CompatibleAuth::Bearer,
+            )
+            .await
         }
         "anthropic" => {
             let body = serde_json::json!({
-                "model": "claude-haiku-4-5-20251001",
+                "model": model.unwrap_or(DEFAULT_ANTHROPIC_MODEL),
                 "max_tokens": 500,
                 "messages": [{"role": "user", "content": prompt}]
             });
@@ -177,8 +296,17 @@ async fn call_llm(
                 .ok_or("No content in response".to_string())
         }
         "ollama" => {
-            let base = ollama_url.unwrap_or("http://localhost:11434");
-            let model = model.unwrap_or("llama3");
+            let base = settings
+                .meta
+                .get("base_url")
+                .map(|u| u.as_str())
+                .filter(|u| !u.is_empty())
+                .unwrap_or(DEFAULT_OLLAMA_URL);
+            let model = model.unwrap_or(DEFAULT_OLLAMA_MODEL);
+
+            // Start `ollama serve` ourselves if nothing is listening.
+            crate::ollama::ensure_running(base).await?;
+
             let body = serde_json::json!({
                 "model": model,
                 "prompt": prompt,
@@ -192,6 +320,11 @@ async fn call_llm(
                 .await
                 .map_err(|e| format!("Ollama request failed: {e}"))?;
 
+            if resp.status().as_u16() == 404 {
+                return Err(format!(
+                    "Ollama model '{model}' is not pulled. Run `ollama pull {model}` once, then try again."
+                ));
+            }
             if !resp.status().is_success() {
                 let status = resp.status();
                 let text = resp.text().await.unwrap_or_default();
@@ -207,7 +340,17 @@ async fn call_llm(
                 .map(|s| s.to_string())
                 .ok_or("No response field from Ollama".to_string())
         }
-        _ => Err(format!("Unknown provider: {provider}")),
+        other => {
+            let url = chat_completions_url(other)
+                .ok_or_else(|| format!("Unknown provider: {other}"))?;
+            let fallback = match other {
+                "openai" => Some(DEFAULT_OPENAI_MODEL),
+                "opencode-go" => Some(DEFAULT_OPENCODE_GO_MODEL),
+                _ => None,
+            };
+            let model = require_model(model.or(fallback), other)?;
+            call_openai_compatible(prompt, url, api_key, model, other, CompatibleAuth::Bearer).await
+        }
     }
 }
 
@@ -317,19 +460,50 @@ Respond ONLY with valid JSON in this exact format:
     )
 }
 
-pub fn get_llm_settings(conn: &rusqlite::Connection) -> Result<(String, String, Option<String>, Option<String>, String), String> {
-    let provider = migrations::settings_get(conn, "llm_provider")
-        .unwrap_or_else(|| "openai".to_string());
-    let api_key = crate::commands::settings::get_secret("llm_api_key").unwrap_or_default();
-    let ollama_url = migrations::settings_get(conn, "ollama_url");
-    let ollama_model = migrations::settings_get(conn, "ollama_model");
-    let pat = crate::commands::settings::get_secret("github_pat").unwrap_or_default();
+pub struct LlmSettings {
+    pub provider: String,
+    pub api_key: String,
+    /// The active connection's default model; per-provider fallback when unset.
+    pub model: Option<String>,
+    /// Provider extras from the connection (base_url, endpoint, ...).
+    pub meta: std::collections::HashMap<String, String>,
+    pub pat: String,
+}
 
-    if api_key.is_empty() && provider != "ollama" {
-        return Err("LLM API key not set. Open Settings (,) to add your key.".to_string());
+/// LLM execution settings derived from the active Conduit connection
+/// (`~/.eunha/connections.toml`). Connection management itself lives in the
+/// frontend (`@conduit/core`) — this is the read-only execution view.
+pub fn get_llm_settings() -> Result<LlmSettings, String> {
+    let file = crate::conduit::read_connections();
+    let no_connection =
+        || "No AI provider connected. Open Settings (,) to connect one.".to_string();
+    let active_id = file.active.ok_or_else(no_connection)?;
+    let conn = file
+        .connections
+        .into_iter()
+        .find(|c| c.id == active_id)
+        .ok_or_else(no_connection)?;
+
+    let api_key = conn.api_key.unwrap_or_default();
+    // Keyless providers: local servers that ignore credentials.
+    let keyless = matches!(conn.provider.as_str(), "ollama" | "lmstudio");
+    if api_key.is_empty() && !keyless {
+        return Err(format!(
+            "No API key stored for the active {} connection. Open Settings (,) to reconnect.",
+            conn.provider
+        ));
     }
 
-    Ok((provider, api_key, ollama_url, ollama_model, pat))
+    let meta = conn.meta.unwrap_or_default();
+    let pat = crate::commands::settings::get_secret("github_pat").unwrap_or_default();
+
+    Ok(LlmSettings {
+        provider: conn.provider,
+        api_key,
+        model: conn.default_model,
+        meta,
+        pat,
+    })
 }
 
 pub fn repo_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Repo> {
@@ -380,10 +554,7 @@ pub async fn describe_repo(
         .map_err(|e| format!("Repo not found: {e}"))?
     };
 
-    let (provider, api_key, ollama_url, ollama_model, pat) = {
-        let conn = state.0.lock().map_err(|e| e.to_string())?;
-        get_llm_settings(&conn)?
-    };
+    let llm = get_llm_settings()?;
 
     let output_language = {
         let conn = state.0.lock().map_err(|e| e.to_string())?;
@@ -391,10 +562,10 @@ pub async fn describe_repo(
             .unwrap_or_else(|| "English".to_string())
     };
 
-    let readme = if !pat.is_empty() {
+    let readme = if !llm.pat.is_empty() {
         tokio::time::timeout(
             std::time::Duration::from_secs(5),
-            fetch_readme(&repo.full_name, &pat),
+            fetch_readme(&repo.full_name, &llm.pat),
         )
         .await
         .unwrap_or(None)
@@ -406,7 +577,7 @@ pub async fn describe_repo(
 
     let raw = tokio::time::timeout(
         std::time::Duration::from_secs(30),
-        call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), ollama_model.as_deref()),
+        call_llm(&prompt, &llm),
     )
     .await
     .map_err(|_| "Describe timed out after 30s".to_string())??;
@@ -454,10 +625,7 @@ pub async fn batch_describe(
     let mut described = 0u32;
     let mut failed = 0u32;
 
-    let (provider, api_key, ollama_url, ollama_model, pat) = {
-        let conn = state.0.lock().map_err(|e| e.to_string())?;
-        get_llm_settings(&conn)?
-    };
+    let llm = get_llm_settings()?;
 
     let output_language = {
         let conn = state.0.lock().map_err(|e| e.to_string())?;
@@ -476,10 +644,10 @@ pub async fn batch_describe(
             }),
         );
 
-        let readme = if !pat.is_empty() {
+        let readme = if !llm.pat.is_empty() {
             tokio::time::timeout(
                 std::time::Duration::from_secs(5),
-                fetch_readme(&repo.full_name, &pat),
+                fetch_readme(&repo.full_name, &llm.pat),
             )
             .await
             .unwrap_or(None)
@@ -491,7 +659,7 @@ pub async fn batch_describe(
 
         let raw_result = tokio::time::timeout(
             std::time::Duration::from_secs(30),
-            call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), ollama_model.as_deref()),
+            call_llm(&prompt, &llm),
         )
         .await;
 
@@ -502,7 +670,7 @@ pub async fn batch_describe(
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     match tokio::time::timeout(
                         std::time::Duration::from_secs(30),
-                        call_llm(&prompt, &provider, &api_key, ollama_url.as_deref(), ollama_model.as_deref()),
+                        call_llm(&prompt, &llm),
                     )
                     .await
                     {
@@ -545,6 +713,53 @@ pub async fn batch_describe(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chat_url_table_covers_all_openai_compatible_providers() {
+        const PROVIDERS: &[&str] = &[
+            "openai",
+            "opencode-go",
+            "opencode",
+            "gemini",
+            "openrouter",
+            "deepseek",
+            "xai",
+            "qwen",
+            "qwen-cn",
+            "zai",
+            "moonshot",
+            "moonshot-cn",
+            "minimax",
+            "minimax-cn",
+            "stepfun",
+            "xiaomi",
+            "upstage",
+            "arcee",
+            "nvidia",
+            "huggingface",
+            "fireworks",
+            "deepinfra",
+            "novita",
+            "gmi-cloud",
+            "ollama-cloud",
+            "kilo",
+            "nous-portal",
+            "tencent-tokenhub",
+            "github-copilot",
+        ];
+        for provider in PROVIDERS {
+            let url = chat_completions_url(provider)
+                .unwrap_or_else(|| panic!("missing chat URL for {provider}"));
+            assert!(url.starts_with("https://"), "{provider}: {url}");
+            assert!(url.ends_with("/chat/completions"), "{provider}: {url}");
+        }
+        // Non-compatible providers route elsewhere.
+        assert!(chat_completions_url("anthropic").is_none());
+        assert!(chat_completions_url("ollama").is_none());
+        assert!(chat_completions_url("azure-foundry").is_none());
+        assert!(chat_completions_url("lmstudio").is_none());
+        assert!(chat_completions_url("nope").is_none());
+    }
 
     #[test]
     fn valid_json_extracts_fields_correctly() {

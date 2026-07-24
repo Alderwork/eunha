@@ -1,0 +1,33 @@
+{
+  "id": "88515739-ffe0-4432-b71e-844ff0cc5aa6",
+  "object": "chat.completion",
+  "created": 1782914398,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"Go Micro는 Go 언어용 에이전트 하네스 및 서비스 프레임워크입니다.\",\n  \"why\": \"Go 기반 마이크로서비스 및 AI 에이전트 개발을 단순화합니다.\",\n  \"use_case\": \"AI 에이전트를 포함한 마이크로서비스 아키텍처 구축\",\n  \"category\": \"Framework\",\n  \"tags\": [\"go\", \"microservices\", \"ai-agents\", \"distributed-systems\"]\n}",
+        "reasoning_content": "We need to extract information from the given GitHub repo details: micro/go-micro. It's described as \"A Go agent harness and service framework\". Language: Go. Topics include ai, ai-agents, distributed-systems, go, golang, mcp, micro, microservices. README excerpt says it's an agent harness and service framework for Go.\n\nWe need to output JSON with \"what\", \"why\", \"use_case\" in Korean, and \"category\", \"tags\" in English.\n\nConstraints: each sentence max 80 chars. Category must be one of: CLI Tool | Library | Framework | Service | Learning Resource | Template | Other.\n\nBased on the description, it's a framework for building microservices and AI agents. So category likely \"Framework\". Tags: from topics, we can use some like \"go\", \"microservices\", \"ai-agents\", \"distributed-systems\", \"mcp\" (though MCP might be Model Context Protocol? but we'll include as tag). Keep tags relevant and not too many. Maybe: [\"go\", \"microservices\", \"ai-agents\", \"distributed-systems\"].\n\nNow what in Korean: \"Go Micro는 Go 언어로 된 AI 에이전트 하네스 및 서비스 프레임워크입니다.\" But must be max 80 chars. Let's count: that sentence is longer? Let's compute: \"Go Micro는 Go 언어로 된 AI 에이전트 하네스 및 서비스 프레임워크입니다.\" - about 30 characters? Actually Korean characters count as 1 each. That sentence has 22 characters? Let's write: \"Go Micro는 Go 언어로 된 AI 에이전트 하네스 및 서비스 프레임워크입니다.\" That's 23 characters? No, careful: \"Go Micro\" is English, but counted. Better to write in Korean fully: \"Go Micro는 Go 언어 기반 에이전트 하네스 및 서비스 프레임워크입니다.\" That's around 25. But we need one sentence. Could be simpler: \"Go 기반 에이전트 하네스 및 서비스 프레임워크\" but that's not a complete sentence. The instruction says \"One sentence: what this repo IS\". So we should say it is a harness and framework. In Korean: \"이 리포지토리는 Go로 작성된 에이전트 하네스 및 서비스 프레임워크입니다.\" That's around 25 chars? Actually \"이 리포지토리는 Go로 작성된 에이전트 하네스 및 서비스 프레임워크입니다.\" has about 22 characters (Korean) plus \"Go\". Let's count: 이(1) 리(2) 포(3) 지(4) 토(5) 리(6) 는(7) (space) G(8) o(9) 로(10) (space) 작(11) 성(12) 된(13) (space) 에(14) 이(15) 전(16) 트(17) (space) 하(18) 네(19) 스(20) (space) 및(21) (space) 서(22) 비(23) 스(24) (space) 프(25) 레(26) 임(27) 워(28) 크(29) 입(30) 니(31) 다(32).(33) That's 33 characters, but includes spaces and English letters \"Go\". The constraint says max 80 chars, so fine.\n\nAlternatively, we can be more concise: \"Go Micro는 Go 언어용 에이전트 하네스 및 서비스 프레임워크입니다.\" That's similar.\n\nBut let's ensure it captures the essence: agent harness and service framework. So for \"what\": \"Go 기반 에이전트 하네스 및 서비스 프레임워크\".\n\nBetter to use sentence from README: \"Go Micro is an agent harness and service framework for Go.\" So in Korean: \"Go Micro는 Go를 위한 에이전트 하네스 및 서비스 프레임워크입니다.\" That's good.\n\nFor \"why\": Why a developer would care. Perhaps: \"마이크로서비스와 AI 에이전트를 쉽게 구축할 수 있습니다.\" (Easily build microservices and AI agents). Or \"Go로 확장 가능한 분산 시스템을 빠르게 개발할 수 있습니다.\" (Quickly develop scalable distributed systems in Go). Let's pick one that fits. The topics include ai, ai-agents, distributed-systems, microservices. So: \"Go 기반 마이크로서비스 및 AI 에이전트 개발을 단순화합니다.\" (Simplifies development of Go-based microservices and AI agents). That's about 30 chars.\n\nFor \"use_case\": Specific scenario. Perhaps: \"AI 에이전트를 포함한 마이크로서비스 아키텍처 구축\" (Building microservice architecture including AI agents). Or \"분산 시스템에서 AI 에이전트를 관리하고 실행\" (Manage and run AI agents in distributed systems). Keep within 80 chars.\n\nI'll craft:\n\n\"what\": \"Go Micro는 Go 언어용 에이전트 하네스 및 서비스 프레임워크입니다.\" (length: 17? Actually let's count properly: Go Micro는(9) Go(1) 언어용(3) 에이전트(4) 하네스(3) 및(2) 서비스(3) 프레임워크입니다(7) = 32? Not sure, but it's fine.)\n\nBut maybe shorter: \"Go 기반 에이전트 하네스 및 서비스 프레임워크\" is not a sentence. So I'll use the one above.\n\nAlternatively, \"에이전트 하네스와 서비스 프레임워크를 제공하는 Go 라이브러리\" but that's more library.\n\nSince it's a framework, I'll stick with framework.\n\nFor \"category\": \"Framework\".\n\nFor \"tags\": [\"go\", \"microservices\", \"ai-agents\", \"distributed-systems\"].\n\nBut also note \"mcp\" is a topic, but maybe not necessary.\n\nNow produce JSON.\n\nMake sure only JSON output.\n\nLet's write final response."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 432,
+    "completion_tokens": 1449,
+    "total_tokens": 1881,
+    "prompt_tokens_details": {
+      "cached_tokens": 384
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1336
+    },
+    "prompt_cache_hit_tokens": 384,
+    "prompt_cache_miss_tokens": 48
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

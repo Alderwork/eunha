@@ -1,0 +1,33 @@
+{
+  "id": "a889f7f7-8cc2-4fcc-8493-3b74d39c13b5",
+  "object": "chat.completion",
+  "created": 1782914256,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"Gemini CLI는 터미널에서 Gemini AI의 기능을 사용할 수 있는 오픈소스 CLI 도구입니다.\",\n  \"why\": \"개발자는 복잡한 설정 없이 터미널에서 바로 Gemini AI를 활용할 수 있습니다.\",\n  \"use_case\": \"터미널에서 파일 분석, 코드 생성, MCP 서버와 통신 등 다양한 AI 작업을 수행합니다.\",\n  \"category\": \"CLI Tool\",\n  \"tags\": [\"cli\", \"gemini\", \"ai\", \"mcp-client\", \"ai-agents\"]\n}",
+        "reasoning_content": "We are to respond with JSON only. The repo is \"gemini-cli\", an open-source AI agent that brings Gemini to the terminal. We need to write \"what\", \"why\", and \"use_case\" in Korean. Keep \"category\" and \"tags\" in English. Ensure each sentence max 80 chars.\n\nLet's compose:\n\n- what: \"Gemini CLI는 터미널에서 Gemini AI의 기능을 사용할 수 있는 오픈소스 CLI 도구입니다.\" Check length: \"Gemini CLI는 터미널에서 Gemini AI의 기능을 사용할 수 있는 오픈소스 CLI 도구입니다.\" That's 49? Actually count: \"Gemini CLI는 터미널에서 Gemini AI의 기능을 사용할 수 있는 오픈소스 CLI 도구입니다.\" -> I'll count characters: G(1)e2m3i4n5i6 7C8L9I10는11 12터13미14널15에16서17 18G19e20m21i22n23i24 25A26I27의28 29기30능31을32 33사34용35하36수37 38있39는40 41오42픈43소44스45 46C47L48I49 50도51구52입53니54다. That's 54 chars, okay.\n\n- why: \"개발자는 복잡한 설정 없이 터미널에서 바로 Gemini AI를 활용할 수 있습니다.\" Check length: \"개발자는 복잡한 설정 없이 터미널에서 바로 Gemini AI를 활용할 수 있습니다.\" Count: 개1발2자3는4 5복6잡7한8 9설10정11 12없13이14 15터16미17널18에19서20 21바22로23 24G25e26m27i28n29i30 31A32I33를34 35활36용37할38 39수40 41있42습43니44다. That's 44, okay.\n\n- use_case: \"터미널에서 파일 분석, 코드 생성, MCP 서버와 통신 등 다양한 AI 작업을 수행합니다.\" Check length: \"터미널에서 파일 분석, 코드 생성, MCP 서버와 통신 등 다양한 AI 작업을 수행합니다.\" Count: 터1미2널3에4서5 6파7일8 9분10석11,12 13코14드15 16생17성18,19 20M21C22P23 24서25버26와27 28통29신30 31등32 33다34양35한36 37A38I39 40작41업42을43 44수45행46합47니48다. That's 48, okay.\n\n- category: \"CLI Tool\" fits.\n\n- tags: [\"cli\", \"gemini\", \"ai\", \"mcp\", \"typescript\"]\n\nBut ensure tags are from topics? Topics: ai, ai-agents, cli, gemini, gemini-api, mcp-client, mcp-server. We can pick some common ones. Suggested tags: [\"cli\", \"gemini\", \"ai\", \"mcp-client\", \"typescript\"]? But the repo is TypeScript, but language isn't a topic. Tags should be lowercase. Use from topics: ai, cli, gemini, mcp-client, mcp-server. But maybe include \"ai-agents\"? It's a topic. Let's choose 4-5 tags. I'll use: [\"cli\", \"gemini\", \"ai\", \"mcp-client\", \"ai-agents\"].\n\nOr perhaps \"mcp-server\"? Since it's both. But requirements say \"tags\" in English, lowercase.\n\nLet's finalize JSON.\n\nCheck each field length constraints: \"what\" max 80 chars, \"why\" max 80, \"use_case\" max 80. All good.\n\nOutput only JSON."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 470,
+    "completion_tokens": 1003,
+    "total_tokens": 1473,
+    "prompt_tokens_details": {
+      "cached_tokens": 384
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 872
+    },
+    "prompt_cache_hit_tokens": 384,
+    "prompt_cache_miss_tokens": 86
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

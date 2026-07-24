@@ -1,0 +1,25 @@
+- generic [active] [ref=e1]:
+  - heading "A-1 — inner shifted right + up (matches original orb highlight)" [level=1] [ref=e2]
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: 72px
+      - img [ref=e6]
+    - generic [ref=e8]:
+      - generic [ref=e9]: 36px
+      - img [ref=e10]
+    - generic [ref=e12]:
+      - generic [ref=e13]: 18px
+      - img [ref=e14]
+    - generic [ref=e17]:
+      - generic [ref=e18]: menu bar
+      - generic [ref=e19]:
+        - img [ref=e20]
+        - generic [ref=e22]: eunha
+        - generic [ref=e23]: ▾
+      - generic [ref=e24]:
+        - img [ref=e25]
+        - generic [ref=e27]: eunha
+        - generic [ref=e28]: ▾
+    - generic [ref=e30]:
+      - generic [ref=e31]: 오리지널 로고
+      - img [ref=e32]

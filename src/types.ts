@@ -1,3 +1,14 @@
+export interface Collection {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  sort_order: number;
+  is_read_later: boolean;
+  repo_count: number;
+  created_at: string | null;
+}
+
 export interface Repo {
   id: string;
   full_name: string;
@@ -46,6 +57,12 @@ export interface ImportResult {
   error: string | null;
 }
 
+export interface SyncStarsResult {
+  added: number;
+  removed: number;
+  removed_names: string[];
+}
+
 export interface BatchDescribeResult {
   described: number;
   failed: number;
@@ -70,7 +87,6 @@ export interface LatestRelease {
   html_url: string;
 }
 
-export type Provider = 'openai' | 'anthropic' | 'ollama';
 
 export interface TrendingRepo {
   full_name: string;
@@ -120,4 +136,16 @@ export interface DigestItem {
 export interface DigestBatch {
   batch_date: string;
   items: DigestItem[];
+}
+
+export interface SimilarRepo {
+  repo: Repo;
+  similarity_score: number;
+}
+
+export interface ContributionData {
+  good_first_issue_count: number;
+  open_pr_count: number;
+  has_contributing_md: boolean;
+  github_url: string;
 }

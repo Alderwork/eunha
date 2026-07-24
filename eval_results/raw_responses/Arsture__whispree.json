@@ -1,0 +1,33 @@
+{
+  "id": "7f1ec2ba-09eb-480f-b849-82cd7b7b15fd",
+  "object": "chat.completion",
+  "created": 1782914552,
+  "model": "deepseek-v4-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"what\": \"무료 로컬 macOS 메뉴바 음성-텍스트 앱, LLM 후처리 지원\",\n  \"why\": \"무료 오픈소스 로컬 음성-텍스트 앱으로 프라이버시 보호 및 사용자 정의 가능\",\n  \"use_case\": \"개발자가 음성으로 코드를 입력하고 LLM으로 자동 수정\",\n  \"category\": \"Other\",\n  \"tags\": [\"speech-to-text\", \"macos\", \"open-source\", \"llm\", \"voice-coding\"]\n}",
+        "reasoning_content": "We need to generate JSON output based on the GitHub repo info. The repo is \"Arsture/whispree\". Description: \"Free, fully local macOS menu bar app for speech-to-text with LLM post-processing. Open-source SuperWhisper alternative for Apple Silicon.\" Language: Swift. README says \"Start voice-coding with just an OpenAI account. For free.\" and mentions it's for macOS 14+.\n\nWe need to write \"what\", \"why\", \"use_case\" in Korean, each max 80 chars. \"category\" and \"tags\" in English. Category should be one of the listed. Based on description, it's an app, so category likely \"Other\" or maybe \"Service\"? But it's a macOS app, not a library or CLI. It says \"menu bar app\", so it's an application. \"Other\" might be appropriate. Alternatively, \"Service\" if it's a local service. But I think \"Other\" is fine.\n\nTags: relevant keywords. Since it's voice-to-text, LLM, macOS app, free, open-source, SuperWhisper alternative. Tags could be: \"speech-to-text\", \"macos\", \"app\", \"open-source\", \"llm\", \"voice-coding\". But keep tags concise and in English. Maybe 2-5 tags.\n\nLet's craft:\n\n- what: 무료로 사용 가능한 로컬 macOS 메뉴바 음성-텍스트 앱 (Free, fully local macOS menu bar speech-to-text app) - but need to keep under 80 chars, in Korean. Let's count: \"무료 로컬 macOS 메뉴바 음성-텍스트 앱\" (about 20 chars). Add with LLM post-processing? Could be: \"무료 로컬 macOS 메뉴바 음성-텍스트 앱 (LLM 후처리)\" but that might be too long. Max 80 chars, so we can be a bit more descriptive. \"완전 로컬 macOS 메뉴바 음성-텍스트 앱, LLM 후처리 지원\" (33 chars). OK.\n\n- why: 개발자가 관심 가질 이유: 오픈소스 SuperWhisper 대안, Apple Silicon 최적화, 무료. \"오픈소스 SuperWhisper 대안, Apple Silicon 최적화, 무료 사용\" (29 chars). But max 80, so we can be more specific. \"완전 로컬에서 동작하며 OpenAI 계정만으로 음성코딩 가능\" (28 chars) but that's more about what. Need why developer cares: \"무료, 오픈소스, 로컬 프라이버시 보호, Swift 기반\" (22 chars). Maybe: \"무료 오픈소스 로컬 음성-텍스트 앱으로 프라이버시 보호 및 사용자 정의 가능\" (33 chars). It's a good why.\n\n- use_case: 특정 시나리오: \"코드 작성 시 음성으로 입력하고 LLM으로 후처리하여 생산성 향상\" (29 chars). Or \"개발자가 음성으로 코드를 입력하고 LLM으로 자동 수정\" (27 chars). Max 80.\n\n- category: \"Other\" (since it's a standalone app)\n\n- tags: [\"speech-to-text\", \"macos\", \"open-source\", \"llm\", \"voice-coding\"]\n\nLet me finalize and ensure JSON format exactly as specified.\n\nResponse must be ONLY valid JSON object. No extra text.\n\nI'll output:\n\n{\n  \"what\": \"무료 로컬 macOS 메뉴바 음성-텍스트 앱, LLM 후처리 지원\",\n  \"why\": \"무료 오픈소스 로컬 음성-텍스트 앱으로 프라이버시 보호 및 사용자 정의 가능\",\n  \"use_case\": \"개발자가 음성으로 코드를 입력하고 LLM으로 자동 수정\",\n  \"category\": \"Other\",\n  \"tags\": [\"speech-to-text\", \"macos\", \"open-source\", \"llm\", \"voice-coding\"]\n}\n\nCheck lengths: what: 33 chars (including spaces), why: 37 chars, use_case: 31 chars. All under 80.\n\nCategory is \"Other\", tags in English. Good.\n\nI think that's appropriate."
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 449,
+    "completion_tokens": 1072,
+    "total_tokens": 1521,
+    "prompt_tokens_details": {
+      "cached_tokens": 384
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 944
+    },
+    "prompt_cache_hit_tokens": 384,
+    "prompt_cache_miss_tokens": 65
+  },
+  "system_fingerprint": "fp_8b330d02d0_prod0820_fp8_kvcache_20260402",
+  "cost": "0"
+}

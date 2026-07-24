@@ -1,7 +1,9 @@
 mod commands;
+mod conduit;
 mod config;
 mod db;
 mod models;
+mod ollama;
 
 use commands::feed::FeedCancelState;
 use commands::import::CancelState;
@@ -21,10 +23,18 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let conn = db::open(app.handle())?;
+            // One-time: legacy llm_api_key + provider settings → connections.toml.
+            // Failure must not block startup; the user can reconnect via Settings.
+            if let Err(e) = conduit::migrate_legacy_llm_settings(&conn) {
+                log::error!("conduit migration failed: {e}");
+            }
             app.manage(DbState(Mutex::new(conn)));
             app.manage(CancelState(Arc::new(AtomicBool::new(false))));
             app.manage(FeedCancelState(Arc::new(AtomicBool::new(false))));
             app.manage(TrayState(Mutex::new(None)));
+
+            // Periodic star-list sync — runs in the background for the app's lifetime.
+            commands::sync::start_star_sync_scheduler(app.handle().clone());
 
             // Set app icon at runtime so it shows in Cmd+Tab / Mission Control
             // even when running via `tauri dev` (no .app bundle present).
@@ -45,12 +55,18 @@ pub fn run() {
             commands::library::get_app_constants,
             commands::import::import_stars,
             commands::import::cancel_import,
+            commands::sync::sync_stars,
             commands::add::add_repo,
             commands::describe::describe_repo,
             commands::describe::batch_describe,
             commands::settings::save_settings,
             commands::settings::get_settings,
             commands::settings::set_tray_visible,
+            conduit::conduit_list,
+            conduit::conduit_save,
+            conduit::conduit_delete,
+            conduit::conduit_set_active,
+            conduit::conduit_http,
             commands::feed::fetch_feed,
             commands::feed::cancel_feed_fetch,
             commands::feed::get_feed_items,
@@ -82,6 +98,17 @@ pub fn run() {
             commands::digest::get_current_digest,
             commands::digest::record_digest_action,
             commands::digest::get_launch_digest,
+            commands::collections::create_collection,
+            commands::collections::list_collections,
+            commands::collections::rename_collection,
+            commands::collections::delete_collection,
+            commands::collections::add_repo_to_collection,
+            commands::collections::remove_repo_from_collection,
+            commands::collections::get_collection_repos,
+            commands::collections::get_repo_collections,
+            commands::similar::get_similar_repos,
+            commands::contribution::get_contribution_data,
+            commands::engagement::record_engagement,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

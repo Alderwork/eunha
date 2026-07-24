@@ -65,6 +65,7 @@ pub fn select_candidates(conn: &Connection, w: &Weights, pool: usize) -> rusqlit
             + ?2 * (repos.llm_summary IS NULL)
             + ?3 * ABS(RANDOM() % 1000) / 1000.0
             - ?4 * COALESCE(d.surfaced_count, 0)
+            + ?5 * COALESCE(e.engagement_weight, 0)
             ) AS base_score,
             CAST((julianday('now') - COALESCE(julianday(repos.added_at), julianday('now'))) / 30.0 AS INTEGER) AS forgotten_months
          FROM repos
@@ -72,16 +73,22 @@ pub fn select_candidates(conn: &Connection, w: &Weights, pool: usize) -> rusqlit
             SELECT repo_id, MAX(surfaced_at) AS last_surfaced, COUNT(*) AS surfaced_count
             FROM digest_items GROUP BY repo_id
          ) d ON d.repo_id = repos.id
+         LEFT JOIN (
+            SELECT repo_id, SUM(event_count) * 1.0 / 10.0 AS engagement_weight
+            FROM repo_engagement
+            GROUP BY repo_id
+         ) e ON e.repo_id = repos.id
          WHERE repos.resurface_archived = 0
-           AND (d.last_surfaced IS NULL OR julianday('now') - julianday(d.last_surfaced) >= ?5)
+           AND (d.last_surfaced IS NULL OR julianday('now') - julianday(d.last_surfaced) >= ?6)
          ORDER BY base_score DESC
-         LIMIT ?6",
+         LIMIT ?7",
         cols = REPO_COLS_PREFIXED
     );
 
     let mut stmt = conn.prepare(&sql)?;
+    let engagement_weight = 0.2; // 20% boost per unit engagement
     let rows = stmt.query_map(
-        params![w.forgotten, w.undescribed, w.serendipity, w.fatigue, COOLDOWN_DAYS, pool as i64],
+        params![w.forgotten, w.undescribed, w.serendipity, w.fatigue, engagement_weight, COOLDOWN_DAYS, pool as i64],
         |row| {
             let repo = repo_from_row(row)?;
             let base_score: f64 = row.get(22)?;

@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result};
 
-const CURRENT_SCHEMA_VERSION: u32 = 11;
+const CURRENT_SCHEMA_VERSION: u32 = 12;
 
 pub fn run(conn: &Connection) -> Result<()> {
     // WAL mode MUST be set before any schema changes — enables concurrent reads+writes
@@ -229,6 +229,40 @@ pub fn run(conn: &Connection) -> Result<()> {
             );
             CREATE INDEX IF NOT EXISTS idx_digest_batch ON digest_items(batch_date);
             CREATE INDEX IF NOT EXISTS idx_digest_repo  ON digest_items(repo_id);
+        ")?;
+    }
+
+    if version < 12 {
+        conn.execute_batch("
+            CREATE TABLE IF NOT EXISTS collections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                icon TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                is_read_later INTEGER NOT NULL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS collection_items (
+                collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+                repo_id TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+                note TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (collection_id, repo_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_collection_items_repo ON collection_items(repo_id);
+
+            CREATE TABLE IF NOT EXISTS repo_engagement (
+                repo_id TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+                event_type TEXT NOT NULL,
+                event_count INTEGER NOT NULL DEFAULT 1,
+                last_event_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (repo_id, event_type)
+            );
         ")?;
     }
 
@@ -464,5 +498,103 @@ mod tests {
             )
             .unwrap();
         assert_eq!(idx2, 1, "idx_digest_repo should exist");
+    }
+
+    #[test]
+    fn migration_v12_creates_collections_schema() {
+        let conn = open_test_db();
+
+        // collections round-trip
+        conn.execute(
+            "INSERT INTO collections (name, description, icon) VALUES ('My Favs', 'My favorite repos', '⭐')",
+            [],
+        ).unwrap();
+        let (name, is_read_later): (String, i64) = conn
+            .query_row("SELECT name, is_read_later FROM collections WHERE id = 1", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(name, "My Favs");
+        assert_eq!(is_read_later, 0, "is_read_later should default to 0");
+
+        // collection_items FK + cascade
+        conn.execute(
+            "INSERT INTO repos (id, full_name, url, source) VALUES ('a/b','a/b','https://x','manual')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO collection_items (collection_id, repo_id) VALUES (1, 'a/b')",
+            [],
+        ).unwrap();
+        let cnt: i64 = conn
+            .query_row("SELECT COUNT(*) FROM collection_items", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cnt, 1);
+
+        // Cascade delete collection
+        conn.execute("DELETE FROM collections WHERE id = 1", []).unwrap();
+        let cnt: i64 = conn
+            .query_row("SELECT COUNT(*) FROM collection_items", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cnt, 0, "collection_items should cascade on collection delete");
+
+        // Cascade delete repo
+        conn.execute(
+            "INSERT INTO collections (id, name) VALUES (2, 'Test')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO collection_items (collection_id, repo_id) VALUES (2, 'a/b')",
+            [],
+        ).unwrap();
+        conn.execute("DELETE FROM repos WHERE id = 'a/b'", []).unwrap();
+        let cnt: i64 = conn
+            .query_row("SELECT COUNT(*) FROM collection_items", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cnt, 0, "collection_items should cascade on repo delete");
+
+        // repo_engagement round-trip
+        conn.execute(
+            "INSERT INTO repos (id, full_name, url, source) VALUES ('c/d','c/d','https://y','manual')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO repo_engagement (repo_id, event_type, event_count)
+             VALUES ('c/d', 'open_browser', 3)",
+            [],
+        ).unwrap();
+        let (et, cnt): (String, i64) = conn
+            .query_row(
+                "SELECT event_type, event_count FROM repo_engagement WHERE repo_id = 'c/d'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(et, "open_browser");
+        assert_eq!(cnt, 3);
+
+        // Upsert
+        conn.execute(
+            "INSERT INTO repo_engagement (repo_id, event_type, event_count)
+             VALUES ('c/d', 'open_browser', 1)
+             ON CONFLICT(repo_id, event_type)
+             DO UPDATE SET event_count = event_count + 1",
+            [],
+        ).unwrap();
+        let cnt: i64 = conn
+            .query_row(
+                "SELECT event_count FROM repo_engagement WHERE repo_id = 'c/d' AND event_type = 'open_browser'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(cnt, 4, "ON CONFLICT should increment event_count");
+
+        // Cascade delete repo
+        conn.execute("DELETE FROM repos WHERE id = 'c/d'", []).unwrap();
+        let cnt: i64 = conn
+            .query_row("SELECT COUNT(*) FROM repo_engagement", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(cnt, 0, "repo_engagement should cascade on repo delete");
     }
 }

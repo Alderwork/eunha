@@ -13,7 +13,8 @@ eunha is a local-first, keyboard-first desktop app for building a personal GitHu
 - **Tauri v2** — Rust backend (`src-tauri/`), React frontend (`src/`)
 - **rusqlite** — SQLite on disk; FTS5 for search
 - **React + Tailwind** — frontend, with `@tanstack/virtual` for list virtualization
-- **toml** — `~/.eunha/config.toml` (0600) for GitHub PAT + LLM API key
+- **Conduit** (`@conduit/core` + `@conduit/react`, `link:../conduit/packages/*`) — AI provider connections (BYOK). Symlinked live to the sibling repo (do NOT use `file:` — pnpm snapshots it at install time and code changes silently stop propagating). Vite consumes their `dist/`, so rebuild the packages after editing them; `resolve.dedupe: ['react','react-dom']` in vite.config.ts keeps one React copy.
+- **toml** — `~/.eunha/config.toml` (0600) for GitHub PAT; `~/.eunha/connections.toml` (0600) for LLM connections
 - **tauri-plugin-clipboard-manager** — clipboard read on Add dialog open
 
 ## Common Commands
@@ -45,9 +46,20 @@ React (src/)
         ↓ Tauri IPC
 Rust (src-tauri/src/commands/)
   ├── GitHub API (tokio, reqwest) — stars import, repo metadata, README fetch
-  ├── LLM API (reqwest) — OpenAI / Anthropic / Ollama
+  ├── LLM API (reqwest) — OpenAI / Anthropic / Ollama / OpenCode Go
   └── SQLite (rusqlite) — repos table + FTS5 virtual table
 ```
+
+**AI provider connections (Conduit).** Connection management (BYOK: key entry, validation, model discovery, default model) runs on `@conduit/core` in the frontend (`src/lib/conduit.ts`), backed by two Rust bridges in `src-tauri/src/conduit.rs`. All built-in core presets are registered (33 providers) plus two local overrides: `ollama` (native API, auto-managed) and `opencode-go` (static model list + chat-probe validation).
+
+- **Storage** — `conduit_list/save/delete/set_active` commands → `~/.eunha/connections.toml` (0600). Lists strip credentials (`key_set` only).
+- **HTTP proxy** — `conduit_http(connection_id, auth, request)`: Rust looks up the key and injects it per the adapter's auth scheme (bearer / x-api-key / api-key / query / none). **API keys never enter the webview.** The proxy only injects into allowlisted hosts (`ALLOWED_REMOTE_HOSTS` in conduit.rs — update it when adding a provider; Azure Foundry is matched by the `.openai.azure.com` suffix); localhost is always allowed for self-hosted providers.
+
+The LLM *execution* path stays in Rust: `get_llm_settings()` (describe.rs) derives `{provider, api_key, model, meta}` from the active connection; `call_llm` routes by provider — anthropic and ollama have native arms, azure-foundry/lmstudio build their URL from connection meta, and every other provider goes through the `chat_completions_url` table (OpenAI-compatible, bearer) with a `response_format` retry fallback. Providers without a stored `default_model` fail with a "pick a model" error until the user selects one. Legacy `llm_api_key`/`llm_provider` settings are migrated into the first connection on startup (idempotent, then removed from config.toml).
+
+**Ollama is auto-managed** (`src-tauri/src/ollama.rs`): before any Ollama request, `ensure_running()` probes `{base}/api/version`; if the base URL is localhost and nothing answers, the app spawns a detached `ollama serve` itself and waits up to 20s for health. Users never run `ollama serve` manually. If the binary isn't found (PATH, `/opt/homebrew/bin`, `/usr/local/bin`, Ollama.app bundle), the error tells the user to install Ollama. Remote (non-localhost) base URLs are never auto-started. Model pulls are still manual (`ollama pull <model>`) — a 404 from `/api/generate` surfaces that instruction. The conduit proxy calls `ensure_running` only when the connection's provider is `ollama`, so other localhost providers (LM Studio) never spawn a server.
+
+**OpenCode Go** is a provider option (`opencode-go`) using the OpenAI-compatible endpoint `https://opencode.ai/zen/go/v1/chat/completions`. Its model list is a curated static list in `src/lib/conduit.ts` (MiniMax/Qwen use a different endpoint shape and are not wired up). Key validation probes the chat endpoint with `max_tokens: 1` — `/models` is public and returns 200 for any key, so it cannot validate.
 
 ## Database
 
@@ -129,11 +141,21 @@ Use React `onKeyDown` handlers (not Tauri global shortcuts) — keybindings only
 
 ## Secrets
 
-PAT and LLM API key are stored in `~/.eunha/config.toml` (permissions 0600) via `src-tauri/src/config.rs`. Never write them to SQLite. Do not use keychain or tauri-plugin-stronghold.
+GitHub PAT is stored in `~/.eunha/config.toml` (0600) via `src-tauri/src/config.rs`. LLM API keys live in `~/.eunha/connections.toml` (0600) via `src-tauri/src/conduit.rs` and are only ever read by the `conduit_http` proxy — never returned to the webview. Never write secrets to SQLite. Do not use keychain or tauri-plugin-stronghold.
 
 ## Import
 
 Stars import uses `futures::join_all` on 5 concurrent tokio tasks (`GET /user/starred?per_page=100&page=N`). 5 tasks chosen as a safe burst under GitHub's 5000 req/hr authenticated limit. Fetch all pages — no cap. Handle primary 429 with `Retry-After`. Secondary rate limits (burst 403) are in TODOS.md for v1.1.
+
+## Star sync
+
+`sync_stars` (`src-tauri/src/commands/sync.rs`) mirrors the library against the real star list: new stars are inserted, unstarred repos with `source='starred'` are deleted (manual repos are never touched). A background scheduler spawned in `lib.rs` setup runs it on the `star_sync_interval_minutes` setting (0 = off, default 360) and emits `stars:synced`; the header Sync button and Settings → Account → "Sync now" invoke it directly.
+
+**Safety invariants:**
+- The COMPLETE star list is fetched before any DB write — a partial fetch must never reach `apply_star_sync`, or unstarred detection would delete legitimate rows.
+- Insert + delete happen in ONE transaction (`apply_star_sync` in import.rs), using temp tables for the id sets.
+- FK cascades are NOT enforced (no `PRAGMA foreign_keys`), so dependent rows in `releases`, `release_assets`, `digest_items`, `collection_items`, `repo_engagement` are deleted explicitly before the repo row.
+- A static `AtomicBool` guard prevents overlapping syncs (button vs scheduler).
 
 ## Design System
 

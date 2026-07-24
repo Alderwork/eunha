@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
-import { Repo, CategoryCount, AppConstants, BatchDescribeProgress, BatchDescribeResult, DigestBatch } from './types';
+import { Repo, CategoryCount, AppConstants, BatchDescribeProgress, BatchDescribeResult, DigestBatch, Collection, SyncStarsResult } from './types';
 import { useKeydown } from './hooks/useKeydown';
 import { RepoRowDense } from './components/repo-views/RepoRowDense';
 import { RepoRowComfy } from './components/repo-views/RepoRowComfy';
@@ -28,6 +28,8 @@ import { CategorySidebar } from './components/CategorySidebar';
 import { Button } from './components/ui/Button';
 import { Kbd } from './components/ui/Kbd';
 import { VariantToggle } from './components/ui/VariantToggle';
+import { CollectionsSidebar } from './components/CollectionsSidebar';
+import { AddToCollectionMenu } from './components/AddToCollectionMenu';
 import { OnboardingFlow, type OnboardingCompleteOpts } from './components/onboarding/OnboardingFlow';
 import { DigestCard } from './components/DigestCard';
 import { getLibraryRowHeight, ViewVariant } from './lib/visuals';
@@ -40,9 +42,12 @@ export default function App() {
   const [repos, setRepos] = useState<Repo[]>([]);
   const [categories, setCategories] = useState<CategoryCount[]>([]);
   const [constants, setConstants] = useState<AppConstants>({ current_prompt_version: 1 });
+  const [collections, setCollections] = useState<Collection[]>([]);
 
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<number | null>(null);
+  const [showCollectionMenu, setShowCollectionMenu] = useState(false);
   const [aiStatus, setAiStatus] = useState<'undescribed' | 'stale' | 'described' | null>(null);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [modal, setModal] = useState<Modal>(null);
@@ -89,6 +94,7 @@ export default function App() {
   const [toast, setToast] = useState<{ msg: string; type: 'info' | 'error' | 'warn' } | null>(null);
   const [keychainError, setKeychainError] = useState<string | null>(null);
   const [patMissing, setPatMissing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const [onboardingState, setOnboardingState] = useState<'loading' | 'show' | 'done'>('loading');
   const [pendingAddModal, setPendingAddModal] = useState(false);
@@ -159,13 +165,51 @@ export default function App() {
 
   async function loadRepos() {
     try {
-      const data = await invoke<Repo[]>('list_repos', {
-        query: query || null,
-        category: selectedCategory,
-        aiStatus,
-      });
+      let data: Repo[];
+      if (selectedCollection !== null) {
+        data = await invoke<Repo[]>('get_collection_repos', {
+          collectionId: selectedCollection,
+          query: query || null,
+          category: selectedCategory,
+        });
+      } else {
+        data = await invoke<Repo[]>('list_repos', {
+          query: query || null,
+          category: selectedCategory,
+          aiStatus,
+        });
+      }
       setRepos(data);
       setSelectedIdx((i) => Math.min(i, Math.max(data.length - 1, 0)));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadCollections() {
+    try {
+      const data = await invoke<Collection[]>('list_collections');
+      setCollections(data);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function toggleReadLater(repo: Repo) {
+    try {
+      const all = await invoke<Collection[]>('list_collections');
+      const rl = all.find((c) => c.is_read_later);
+      if (!rl) return;
+      const repoCols = await invoke<Collection[]>('get_repo_collections', { repoId: repo.id });
+      const inReadLater = repoCols.some((c) => c.is_read_later);
+      if (inReadLater) {
+        await invoke('remove_repo_from_collection', { collectionId: rl.id, repoId: repo.id });
+        showToast('Removed from Read Later');
+      } else {
+        await invoke('add_repo_to_collection', { collectionId: rl.id, repoId: repo.id });
+        showToast('Added to Read Later');
+      }
+      loadCollections();
     } catch (e) {
       console.error(e);
     }
@@ -209,7 +253,7 @@ export default function App() {
 
     invoke<AppConstants>('get_app_constants').then(setConstants);
 
-    invoke<{ pat_set: boolean; pat_masked: string; provider: string; api_key_set: boolean; api_key_masked: string; ollama_url: string }>('get_settings')
+    invoke<{ pat_set: boolean }>('get_settings')
       .then((s) => {
         if (!s.pat_set) setPatMissing(true);
       })
@@ -219,6 +263,7 @@ export default function App() {
 
     loadRepos();
     loadCategories();
+    loadCollections();
     loadUnreadCount();
     loadFeedUnreadCount();
     invoke('backfill_owner_avatars').then(() => loadRepos()).catch(() => {});
@@ -235,7 +280,7 @@ export default function App() {
 
   useEffect(() => {
     loadRepos();
-  }, [query, selectedCategory, aiStatus]);
+  }, [query, selectedCategory, aiStatus, selectedCollection]);
 
   useEffect(() => {
     loadFeedUnreadCount();
@@ -245,6 +290,21 @@ export default function App() {
     let unlisten: (() => void) | null = null;
     listen<BatchDescribeProgress>('batch-describe:progress', (e) => {
       setBatchProgress(e.payload);
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, []);
+
+  // Scheduler-driven star sync (manual sync handles its own result). Quiet
+  // when nothing changed.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    listen<SyncStarsResult>('stars:synced', (e) => {
+      const r = e.payload;
+      if (r.added > 0 || r.removed > 0) {
+        showToast(`Star sync: ${r.added} added, ${r.removed} removed`);
+        loadRepos();
+        loadCategories();
+      }
     }).then((fn) => { unlisten = fn; });
     return () => { unlisten?.(); };
   }, []);
@@ -510,6 +570,9 @@ export default function App() {
         // Toggle the right repo-detail sidebar (i). Works from any view.
         if (e.key === 'i' && !editingId) {
           e.preventDefault();
+          if (detailOpen && sidebarRepo) {
+            invoke('record_engagement', { repoId: sidebarRepo.id, eventType: 'view_detail' }).catch(() => {});
+          }
           setDetailOpen((v) => !v);
           return;
         }
@@ -661,7 +724,10 @@ export default function App() {
             if (!editingId) runBatchDescribe();
             break;
           case 'o':
-            if (repo && !editingId) openUrl(repo.url);
+            if (repo && !editingId) {
+              openUrl(repo.url);
+              invoke('record_engagement', { repoId: repo.id, eventType: 'open_browser' }).catch(() => {});
+            }
             break;
           case 'e':
             if (repo && !editingId) setEditingId(repo.id);
@@ -674,6 +740,14 @@ export default function App() {
             break;
           case 'W':
             setFocusedView('watching');
+            break;
+          case 'm':
+            e.preventDefault();
+            if (repo && !editingId) toggleReadLater(repo);
+            break;
+          case 'M':
+            e.preventDefault();
+            if (repo && !editingId) setShowCollectionMenu(true);
             break;
           case 't':
             setFocusedView('trending');
@@ -689,6 +763,7 @@ export default function App() {
               setFocusedActiveReadmeTabId(repo.id);
               setFocusedView('readme');
               setDetailOpen(true);
+              invoke('record_engagement', { repoId: repo.id, eventType: 'open_readme' }).catch(() => {});
             }
             break;
           case ',':
@@ -743,6 +818,30 @@ export default function App() {
   function handleImportDone() {
     loadRepos();
     loadCategories();
+  }
+
+  async function handleSyncStars() {
+    if (syncing) return;
+    if (patMissing) {
+      showToast('Set your GitHub PAT in Settings first', 'warn');
+      setFocusedView('settings');
+      return;
+    }
+    setSyncing(true);
+    try {
+      const r = await invoke<SyncStarsResult>('sync_stars');
+      if (r.added === 0 && r.removed === 0) {
+        showToast('Stars up to date');
+      } else {
+        showToast(`Star sync: ${r.added} added, ${r.removed} removed`);
+        loadRepos();
+        loadCategories();
+      }
+    } catch (e) {
+      showToast(`Star sync failed — ${e}`, 'error');
+    } finally {
+      setSyncing(false);
+    }
   }
 
   const handleDragRegionMouseDown = useCallback((e: React.MouseEvent) => {
@@ -810,6 +909,22 @@ export default function App() {
             className="text-xs px-2 py-1"
           >
             Import stars
+          </Button>
+          <Button
+            onClick={handleSyncStars}
+            disabled={syncing}
+            className="text-xs px-2 py-1 gap-1.5"
+            title="Sync with your GitHub star list (adds new, removes unstarred)"
+          >
+            <svg
+              width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              className={syncing ? 'animate-spin' : ''}
+            >
+              <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            {syncing ? 'Syncing…' : 'Sync'}
           </Button>
           <Button
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
@@ -919,6 +1034,18 @@ export default function App() {
                 {readmeTabs.length}
               </span>
             </button>
+          )}
+
+          {collections.length > 0 && viewMode === 'library' && (
+            <>
+              <div className="mx-3 my-2 border-t border-border" />
+              <CollectionsSidebar
+                collections={collections}
+                selectedCollection={selectedCollection}
+                onCollectionChange={setSelectedCollection}
+                onCollectionsChange={loadCollections}
+              />
+            </>
           )}
 
           {showCategories && (
@@ -1176,8 +1303,13 @@ export default function App() {
 
               {/* Status bar */}
               <div className="flex-shrink-0 flex items-center justify-between px-5 py-1.5 border-t border-border text-xs text-muted">
-                <span>{repos.length} repos</span>
+                <span>
+                  {selectedCollection !== null
+                    ? `${repos.length} repos in collection`
+                    : `${repos.length} repos`}
+                </span>
                 <span className="flex items-center gap-1">
+                  <Kbd>m</Kbd>{' '}read later ·{' '}
                   <Kbd>w</Kbd>{' '}watch ·{' '}
                   <Kbd>?</Kbd>{' '}help
                 </span>
@@ -1291,6 +1423,15 @@ export default function App() {
       </div>
         </div>
       </main>
+
+      {showCollectionMenu && selectedRepo && (
+        <AddToCollectionMenu
+          repo={selectedRepo}
+          collections={collections}
+          onDone={loadCollections}
+          onClose={() => setShowCollectionMenu(false)}
+        />
+      )}
 
       {modal === 'import' && (
         <ImportModal
