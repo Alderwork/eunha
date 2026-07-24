@@ -24,6 +24,7 @@ function shouldShowReadMore(body: string): boolean {
   return lineBreaks > 6;
 }
 import { Kbd } from './ui/Kbd';
+import { EmptyState } from './ui/EmptyState';
 import { Repo, WatchedRepoEntry } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -526,18 +527,23 @@ export function WatchingView({ onBack, showToast, onRepoUpdated, onUnreadCountCh
                   Loading releases…
                 </div>
               ) : releases.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full gap-2 text-sm text-muted">
-                  {platformFilter !== 'all' ? (
-                    <p>No releases for {PLATFORM_LABELS[platformFilter] ?? platformFilter}.</p>
-                  ) : (
-                    <>
-                      <p>No releases yet.</p>
-                      <p className="text-xs flex items-center gap-1">
-                        Press <Kbd>s</Kbd> to sync.
-                      </p>
-                    </>
-                  )}
-                </div>
+                platformFilter !== 'all' ? (
+                  <EmptyState
+                    title={`No releases for ${PLATFORM_LABELS[platformFilter] ?? platformFilter}.`}
+                    hint="Try a different platform filter."
+                  />
+                ) : (
+                  <EmptyState
+                    icon={
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20.59 13.41L10.59 3.41A2 2 0 0 0 9.17 3H4a1 1 0 0 0-1 1v5.17a2 2 0 0 0 .59 1.41l10 10a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82z" />
+                        <circle cx="7.5" cy="7.5" r="1" />
+                      </svg>
+                    }
+                    title="No releases yet."
+                    hint={<>Press <Kbd>s</Kbd> to sync watched repos.</>}
+                  />
+                )
               ) : (
                 <div className="px-3 py-3 space-y-3">
                   {releases.map((release, idx) => {

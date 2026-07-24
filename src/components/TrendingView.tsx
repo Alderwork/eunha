@@ -5,6 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Repo } from '../types';
 import { useKeydown } from '../hooks/useKeydown';
 import { Kbd } from './ui/Kbd';
+import { EmptyState } from './ui/EmptyState';
 import { Chip } from './ui/Chip';
 import { VariantToggle } from './ui/VariantToggle';
 import { RepoRowDense } from './repo-views/RepoRowDense';
@@ -268,8 +269,17 @@ export function TrendingView({ onBack, showToast, onRepoAdded, viewVariant, onVa
         }
         if (repos.length === 0) {
           return (
-            <div className="flex-1 overflow-y-auto flex items-center justify-center">
-              <span className="text-sm text-muted">No trending repos found.</span>
+            <div className="flex-1 overflow-y-auto">
+              <EmptyState
+                icon={
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                    <polyline points="16 7 22 7 22 13" />
+                  </svg>
+                }
+                title="No trending repos found."
+                hint="Try a wider time range or a different language."
+              />
             </div>
           );
         }
