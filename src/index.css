@@ -26,7 +26,7 @@
   --color-ink:     #f7f8f8;
   --color-dim:     #d0d6e0;
   --color-muted:   #8a8f98;
-  --color-faint:   #62666d;
+  --color-faint:   #767b84; /* AA 4.7:1 on bg (was #62666d at 3.45:1) */
 
   /* Brand + accent (only chromatic family) */
   --color-brand:       #5e6ad2;
@@ -75,7 +75,7 @@ html.light {
   --color-ink:   #0f1011;
   --color-dim:   #3a3b3e;
   --color-muted: #62666d;
-  --color-faint: #8a8f98;
+  --color-faint: #6b7078; /* AA 4.7:1 on bg (was #8a8f98 at 3.05:1) */
 
   --color-brand:      #5e6ad2;
   --color-brand-hover:#828fff;
