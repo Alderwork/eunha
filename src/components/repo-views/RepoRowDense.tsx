@@ -96,7 +96,7 @@ export function RepoRowDense({ repo, isSelected, isDescribing, currentPromptVers
           ) : (
             <>
               {/* meta: lang + stars */}
-              <div className="flex items-center gap-2.5 flex-shrink-0" style={{ paddingTop: '6px' }}>
+              <div className="dense-row-meta flex items-center gap-2.5 flex-shrink-0" style={{ paddingTop: '6px' }}>
                 {repo.language && (
                   <span className="text-[11px] text-dim flex items-center gap-1.5">
                     <LangDot language={repo.language} size={7} />
@@ -113,7 +113,7 @@ export function RepoRowDense({ repo, isSelected, isDescribing, currentPromptVers
 
               {/* category */}
               <div
-                className="text-[11px] text-faint pl-2 border-l border-border-subtle"
+                className="dense-row-category text-[11px] text-faint pl-2 border-l border-border-subtle"
                 style={{ paddingTop: '6px' }}
               >
                 {effectiveCategory ?? ''}
@@ -188,7 +188,7 @@ export function RepoRowDense({ repo, isSelected, isDescribing, currentPromptVers
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2.5 flex-shrink-0 text-faint">
+            <div className="dense-row-meta flex items-center gap-2.5 flex-shrink-0 text-faint">
               {repo.language && (
                 <span className="text-[11px] text-dim flex items-center gap-1.5">
                   <LangDot language={repo.language} size={7} />
@@ -203,7 +203,7 @@ export function RepoRowDense({ repo, isSelected, isDescribing, currentPromptVers
               )}
             </div>
 
-            <div className="text-[11px] text-faint pl-2 border-l border-border-subtle">
+            <div className="dense-row-category text-[11px] text-faint pl-2 border-l border-border-subtle">
               {effectiveCategory ?? ''}
             </div>
           </>

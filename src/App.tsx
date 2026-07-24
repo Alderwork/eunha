@@ -1240,7 +1240,7 @@ export default function App() {
                   )}
                 </div>
               ) : (
-                <div ref={listRef} className="flex-1 overflow-y-auto">
+                <div ref={listRef} className="flex-1 overflow-y-auto repo-list-container">
                   {repos.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-sm text-muted">
                       {query ? 'No repos match your search.' : 'Your library is empty.'}

@@ -150,6 +150,23 @@ input, textarea, select {
 @media (max-width: 1100px) { .eunha-masonry-grid { column-count: 2; } }
 @media (max-width: 720px)  { .eunha-masonry-grid { column-count: 1; } }
 
+/* Dense rows: as the list narrows (small window, open sidebar, split pane),
+   sacrifice meta columns before the repo summary. Category first, then the
+   whole lang/stars rail — the "what" text keeps a floor. */
+.repo-list-container {
+  container-type: inline-size;
+}
+@container (max-width: 620px) {
+  .dense-row-category {
+    display: none;
+  }
+}
+@container (max-width: 480px) {
+  .dense-row-meta {
+    display: none;
+  }
+}
+
 /* Indeterminate top progress bar — shown while a describe round-trip is in flight. */
 @keyframes eunhaProgressSlide {
   0%   { transform: translateX(-100%); }
