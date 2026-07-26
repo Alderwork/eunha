@@ -19,6 +19,7 @@ pub(crate) struct GithubRepo {
     stargazers_count: Option<i64>,
     topics: Option<Vec<String>>,
     owner: Option<GithubOwner>,
+    starred_at: Option<String>,
 }
 
 pub(crate) async fn fetch_page(
@@ -33,7 +34,7 @@ pub(crate) async fn fetch_page(
     let resp = client
         .get(&url)
         .header("Authorization", format!("Bearer {}", pat))
-        .header("Accept", "application/vnd.github.v3+json")
+        .header("Accept", "application/vnd.github.star+json")
         .header("User-Agent", "eunha/1.0")
         .send()
         .await
@@ -99,8 +100,8 @@ fn insert_repo(tx: &rusqlite::Transaction, repo: &GithubRepo) -> rusqlite::Resul
 
     let owner_avatar_url = repo.owner.as_ref().and_then(|o| o.avatar_url.clone());
     let affected = tx.execute(
-        "INSERT OR IGNORE INTO repos (id, full_name, description, url, language, stars_count, topics, source, owner_avatar_url)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'starred', ?8)",
+        "INSERT OR IGNORE INTO repos (id, full_name, description, url, language, stars_count, topics, source, owner_avatar_url, starred_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'starred', ?8, ?9)",
         params![
             repo.full_name,
             repo.full_name,
@@ -108,9 +109,20 @@ fn insert_repo(tx: &rusqlite::Transaction, repo: &GithubRepo) -> rusqlite::Resul
             repo.html_url,
             repo.language,
             repo.stargazers_count,
-            topics_json,
-            owner_avatar_url,
+            &topics_json,
+            &owner_avatar_url,
+            &repo.starred_at,
         ],
+    )?;
+
+    // Refresh GitHub metadata without changing the insertion result used by the
+    // import/sync counters. A missing preview timestamp never overwrites one
+    // already persisted from an earlier response.
+    tx.execute(
+        "UPDATE repos SET description=?2, url=?3, language=?4, stars_count=?5, topics=?6,
+         owner_avatar_url=?7, starred_at=COALESCE(?8, starred_at) WHERE id=?1",
+        params![repo.full_name, repo.description, repo.html_url, repo.language,
+            repo.stargazers_count, topics_json, owner_avatar_url, repo.starred_at],
     )?;
 
     Ok(affected > 0)
@@ -194,6 +206,9 @@ pub(crate) fn apply_star_sync(
              DELETE FROM digest_items WHERE repo_id IN (SELECT id FROM star_sync_stale);
              DELETE FROM collection_items WHERE repo_id IN (SELECT id FROM star_sync_stale);
              DELETE FROM repo_engagement WHERE repo_id IN (SELECT id FROM star_sync_stale);
+             DELETE FROM repo_tags WHERE repo_id IN (SELECT id FROM star_sync_stale);
+             DELETE FROM repo_purposes WHERE repo_id IN (SELECT id FROM star_sync_stale);
+             DELETE FROM classification_suggestions WHERE repo_id IN (SELECT id FROM star_sync_stale);
              DELETE FROM repos WHERE id IN (SELECT id FROM star_sync_stale);",
         )?;
     }
@@ -332,6 +347,7 @@ mod tests {
             stargazers_count: None,
             topics: None,
             owner: None,
+            starred_at: None,
         }
     }
 
@@ -381,7 +397,11 @@ mod tests {
              INSERT INTO repo_engagement (repo_id, event_type) VALUES ('a/1', 'open_browser');
              INSERT INTO digest_items (repo_id, batch_date, reason) VALUES ('a/1', '2026-01-01', 'forgotten');
              INSERT INTO collections (name) VALUES ('c');
-             INSERT INTO collection_items (collection_id, repo_id) VALUES (1, 'a/1');",
+             INSERT INTO collection_items (collection_id, repo_id) VALUES (1, 'a/1');
+             INSERT INTO user_tags (name) VALUES ('tag');
+             INSERT INTO repo_tags (repo_id, tag_id) VALUES ('a/1', 1);
+             INSERT INTO repo_purposes (repo_id, purpose_id) SELECT 'a/1', id FROM purposes LIMIT 1;
+             INSERT INTO classification_suggestions (repo_id) VALUES ('a/1');",
         )
         .unwrap();
 
@@ -396,6 +416,9 @@ mod tests {
         assert_eq!(count("SELECT COUNT(*) FROM repo_engagement"), 0);
         assert_eq!(count("SELECT COUNT(*) FROM digest_items"), 0);
         assert_eq!(count("SELECT COUNT(*) FROM collection_items"), 0);
+        assert_eq!(count("SELECT COUNT(*) FROM repo_tags"), 0);
+        assert_eq!(count("SELECT COUNT(*) FROM repo_purposes"), 0);
+        assert_eq!(count("SELECT COUNT(*) FROM classification_suggestions"), 0);
         // FTS index must not retain stale entries for the deleted repo.
         assert_eq!(count("SELECT COUNT(*) FROM repos_fts"), 0);
         // The collection itself survives — only its membership row is gone.

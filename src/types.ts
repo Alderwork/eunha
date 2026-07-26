@@ -32,7 +32,15 @@ export interface Repo {
   watching: boolean;
   category_locked: boolean;
   owner_avatar_url: string | null;
+  starred_at?: string | null;
+  user_tags?: string[];
+  purposes?: string[];
+  classification_status?: string;
 }
+
+export interface Purpose { id: number; name: string; is_default: boolean }
+export interface UserTag { id: number; name: string }
+export interface ClassificationSuggestion { repo: Repo; suggested_tags: string[]; suggested_purposes: string[] }
 
 export interface CategoryCount {
   category: string;

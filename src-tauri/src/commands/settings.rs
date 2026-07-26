@@ -25,6 +25,7 @@ pub fn save_settings(
     github_pat: Option<String>,
     output_language: Option<String>,
     star_sync_interval_minutes: Option<String>,
+    default_home: Option<String>,
     state: State<'_, DbState>,
     _app: AppHandle,
 ) -> Result<serde_json::Value, String> {
@@ -44,6 +45,10 @@ pub fn save_settings(
     if let Some(interval) = star_sync_interval_minutes {
         migrations::settings_set(&conn, "star_sync_interval_minutes", &interval)
             .map_err(|e| e.to_string())?;
+    }
+    if let Some(home) = default_home {
+        let home = if home == "library" { "library" } else { "watching" };
+        migrations::settings_set(&conn, "default_home", home).map_err(|e| e.to_string())?;
     }
 
     Ok(serde_json::json!({ "keychain_error": config_error }))
@@ -65,6 +70,7 @@ pub fn get_settings(
     let star_sync_interval_minutes = migrations::settings_get(&conn, "star_sync_interval_minutes")
         .unwrap_or_else(|| crate::commands::sync::DEFAULT_SYNC_INTERVAL_MINUTES.to_string());
     let last_star_sync_at = migrations::settings_get(&conn, "last_star_sync_at");
+    let default_home = migrations::settings_get(&conn, "default_home").unwrap_or_else(|| "watching".to_string());
 
     Ok(serde_json::json!({
         "pat_set": !pat.is_empty(),
@@ -73,6 +79,7 @@ pub fn get_settings(
         "show_tray_icon": show_tray_icon,
         "star_sync_interval_minutes": star_sync_interval_minutes,
         "last_star_sync_at": last_star_sync_at,
+        "default_home": default_home,
     }))
 }
 

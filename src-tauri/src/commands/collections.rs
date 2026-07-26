@@ -170,7 +170,7 @@ pub fn get_collection_repos(
     let where_clause = format!("WHERE {}", conditions.join(" AND "));
     let sql = format!(
         "{} r {} ORDER BY r.full_name ASC",
-        REPO_SELECT.replace("FROM repos", "FROM repos r"),
+        REPO_SELECT.replace("repos.id", "r.id").replace("FROM repos", "FROM repos r"),
         where_clause
     );
 

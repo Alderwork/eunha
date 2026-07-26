@@ -530,13 +530,20 @@ pub fn repo_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Repo> {
         watching: row.get::<_, i64>(19).unwrap_or(0) != 0,
         category_locked: row.get::<_, i64>(20).unwrap_or(0) != 0,
         owner_avatar_url: row.get(21).ok(),
+        starred_at: row.get(22).ok(),
+        user_tags: serde_json::from_str::<Vec<String>>(&row.get::<_, String>(23).unwrap_or_else(|_| "[]".to_string())).unwrap_or_default(),
+        purposes: serde_json::from_str::<Vec<String>>(&row.get::<_, String>(24).unwrap_or_else(|_| "[]".to_string())).unwrap_or_default(),
+        classification_status: row.get(25).unwrap_or_else(|_| "pending".to_string()),
     })
 }
 
 pub(crate) const REPO_SELECT: &str =
     "SELECT id, full_name, description, url, language, stars_count, topics, added_at, source,
             llm_summary, llm_what, llm_why, llm_use_case, llm_category, llm_tags, llm_generated_at, prompt_version,
-            user_notes, user_category, watching, category_locked, owner_avatar_url FROM repos";
+            user_notes, user_category, watching, category_locked, owner_avatar_url, starred_at,
+            COALESCE((SELECT json_group_array(name) FROM user_tags ut JOIN repo_tags rt ON rt.tag_id = ut.id WHERE rt.repo_id = repos.id), '[]'),
+            COALESCE((SELECT json_group_array(name) FROM purposes p JOIN repo_purposes rp ON rp.purpose_id = p.id WHERE rp.repo_id = repos.id), '[]'),
+            COALESCE((SELECT status FROM classification_suggestions cs WHERE cs.repo_id = repos.id), 'pending') FROM repos";
 
 #[tauri::command]
 pub async fn describe_repo(
@@ -826,6 +833,10 @@ mod tests {
             watching: false,
             category_locked: false,
             owner_avatar_url: None,
+            starred_at: None,
+            user_tags: vec![],
+            purposes: vec![],
+            classification_status: "pending".to_string(),
         }
     }
 

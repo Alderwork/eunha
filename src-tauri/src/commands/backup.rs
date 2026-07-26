@@ -83,6 +83,10 @@ pub fn export_database(state: State<'_, DbState>) -> Result<Value, String> {
                 watching: row.get::<_, i64>(19).unwrap_or(0) != 0,
                 category_locked: row.get::<_, i64>(20).unwrap_or(0) != 0,
                 owner_avatar_url: None,
+                starred_at: None,
+                user_tags: vec![],
+                purposes: vec![],
+                classification_status: "pending".to_string(),
             })
         })
         .map_err(|e| e.to_string())?

@@ -255,7 +255,7 @@ export function WatchingView({ onBack, showToast, onRepoUpdated, onUnreadCountCh
       setWatchedRepos(newRepos);
       setSelectedRepoIdx((i) => Math.min(i, Math.max(newRepos.length - 1, 0)));
       setReleases([]);
-      showToast(`Removed ${selectedEntry.repo.full_name} from watching`);
+      showToast(`Unfollowed ${selectedEntry.repo.full_name}`);
       onUnreadCountChanged?.();
     } catch (e) {
       showToast(`Failed: ${e}`, 'error');
@@ -686,7 +686,7 @@ export function WatchingView({ onBack, showToast, onRepoUpdated, onUnreadCountCh
                 <Kbd>R</Kbd> all read ·{' '}
                 <Kbd>x</Kbd> expand ·{' '}
                 <Kbd>o</Kbd> open ·{' '}
-                <Kbd>w</Kbd> unwatch
+                <Kbd>w</Kbd> unfollow
               </span>
             </div>
           </>

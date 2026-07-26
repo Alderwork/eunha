@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result};
 
-const CURRENT_SCHEMA_VERSION: u32 = 12;
+const CURRENT_SCHEMA_VERSION: u32 = 13;
 
 pub fn run(conn: &Connection) -> Result<()> {
     // WAL mode MUST be set before any schema changes — enables concurrent reads+writes
@@ -264,6 +264,60 @@ pub fn run(conn: &Connection) -> Result<()> {
                 PRIMARY KEY (repo_id, event_type)
             );
         ")?;
+    }
+
+    if version < 13 {
+        // Star metadata is kept separately from added_at: the latter is a local
+        // import timestamp and cannot be used for a trustworthy recent-stars list.
+        conn.execute_batch("
+            ALTER TABLE repos ADD COLUMN starred_at TEXT;
+            CREATE INDEX IF NOT EXISTS idx_repos_starred_at ON repos(starred_at DESC);
+
+            CREATE TABLE IF NOT EXISTS user_tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS repo_tags (
+                repo_id TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+                tag_id INTEGER NOT NULL REFERENCES user_tags(id) ON DELETE CASCADE,
+                PRIMARY KEY (repo_id, tag_id)
+            );
+            CREATE TABLE IF NOT EXISTS purposes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS repo_purposes (
+                repo_id TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+                purpose_id INTEGER NOT NULL REFERENCES purposes(id) ON DELETE CASCADE,
+                PRIMARY KEY (repo_id, purpose_id)
+            );
+            CREATE TABLE IF NOT EXISTS classification_suggestions (
+                repo_id TEXT PRIMARY KEY REFERENCES repos(id) ON DELETE CASCADE,
+                suggested_tags TEXT NOT NULL DEFAULT '[]',
+                suggested_purposes TEXT NOT NULL DEFAULT '[]',
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewed_at TEXT
+            );
+        ")?;
+        for purpose in ["나중에 읽기", "도입 후보", "개발 참고", "학습", "대체재 탐색"] {
+            conn.execute("INSERT OR IGNORE INTO purposes (name, is_default) VALUES (?1, 1)", [purpose])?;
+        }
+
+        // Preserve existing LLM tags as reusable personal tags. They are only
+        // suggestions: no existing repo receives a required purpose on upgrade.
+        let mut stmt = conn.prepare("SELECT id, llm_tags FROM repos WHERE llm_tags IS NOT NULL")?;
+        let rows: Vec<(String, String)> = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .filter_map(|r| r.ok()).collect();
+        for (repo_id, raw_tags) in rows {
+            let tags: Vec<String> = serde_json::from_str(&raw_tags).unwrap_or_else(|_| raw_tags.split(',').map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).collect());
+            for tag in tags {
+                conn.execute("INSERT OR IGNORE INTO user_tags (name) VALUES (?1)", [&tag])?;
+                conn.execute("INSERT OR IGNORE INTO repo_tags (repo_id, tag_id) SELECT ?1, id FROM user_tags WHERE name = ?2", rusqlite::params![repo_id, tag])?;
+            }
+        }
     }
 
     conn.execute_batch(&format!("PRAGMA user_version = {};", CURRENT_SCHEMA_VERSION))?;
@@ -596,5 +650,18 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM repo_engagement", [], |r| r.get(0))
             .unwrap();
         assert_eq!(cnt, 0, "repo_engagement should cascade on repo delete");
+    }
+
+    #[test]
+    fn migration_v13_creates_star_context_schema_and_defaults() {
+        let conn = open_test_db();
+        conn.execute("INSERT INTO repos (id, full_name, url, source) VALUES ('a/b', 'a/b', 'u', 'starred')", []).unwrap();
+        conn.execute("UPDATE repos SET starred_at = '2026-01-01T00:00:00Z' WHERE id='a/b'", []).unwrap();
+        let defaults: i64 = conn.query_row("SELECT COUNT(*) FROM purposes WHERE is_default=1", [], |r| r.get(0)).unwrap();
+        assert_eq!(defaults, 5);
+        for table in ["user_tags", "repo_tags", "repo_purposes", "classification_suggestions"] {
+            let exists: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1", [table], |r| r.get(0)).unwrap();
+            assert_eq!(exists, 1, "{table} missing");
+        }
     }
 }

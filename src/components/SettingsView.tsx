@@ -57,7 +57,7 @@ const SECTIONS: { id: Section; label: string; description: string }[] = [
   { id: 'app', label: 'App', description: 'Menu bar, display' },
   { id: 'account', label: 'Account', description: 'GitHub access' },
   { id: 'ai', label: 'AI', description: 'Provider, key, language' },
-  { id: 'releases', label: 'Releases', description: 'Watching defaults' },
+  { id: 'releases', label: 'Releases', description: 'Following defaults' },
   { id: 'backup', label: 'Backup', description: 'Export and import' },
 ];
 
@@ -73,6 +73,7 @@ export function SettingsView({ onBack }: Props) {
   const [defaultReleasePlatform, setDefaultReleasePlatform] = useState<string>('');
   const [showTrayIcon, setShowTrayIcon] = useState(true);
   const [starSyncInterval, setStarSyncInterval] = useState('360');
+  const [defaultHome, setDefaultHome] = useState<'watching' | 'library'>('watching');
   const [lastStarSyncAt, setLastStarSyncAt] = useState<string | null>(null);
   const [syncingStars, setSyncingStars] = useState(false);
   const [starSyncMsg, setStarSyncMsg] = useState<{ text: string; error: boolean } | null>(null);
@@ -96,6 +97,7 @@ export function SettingsView({ onBack }: Props) {
       show_tray_icon: boolean;
       star_sync_interval_minutes?: string;
       last_star_sync_at?: string | null;
+      default_home?: 'watching' | 'library';
     }>('get_settings')
       .then((s) => {
         setPatMasked(s.pat_masked);
@@ -104,6 +106,7 @@ export function SettingsView({ onBack }: Props) {
         setShowTrayIcon(s.show_tray_icon);
         setStarSyncInterval(s.star_sync_interval_minutes ?? '360');
         setLastStarSyncAt(s.last_star_sync_at ?? null);
+        setDefaultHome(s.default_home ?? 'watching');
       })
       .catch((e) => setError(`Failed to load settings: ${e}`))
       .finally(() => setLoading(false));
@@ -138,6 +141,7 @@ export function SettingsView({ onBack }: Props) {
         githubPat: pat || undefined,
         outputLanguage: outputLanguage,
         starSyncIntervalMinutes: starSyncInterval,
+        defaultHome,
       });
       if (result.keychain_error) {
         setError(result.keychain_error);
@@ -362,6 +366,17 @@ export function SettingsView({ onBack }: Props) {
                   </SectionShell>
                 )}
 
+                {section === 'app' && (
+                  <SectionShell title="Start screen" description="Choose what Eunha opens after launch.">
+                    <Field label="Default home">
+                      <select value={defaultHome} onChange={(e) => setDefaultHome(e.target.value as 'watching' | 'library')} className={inputCls}>
+                        <option value="watching">Followed project updates</option>
+                        <option value="library">Star library</option>
+                      </select>
+                    </Field>
+                  </SectionShell>
+                )}
+
                 {section === 'ai' && (
                   <SectionShell
                     title="AI"
@@ -392,7 +407,7 @@ export function SettingsView({ onBack }: Props) {
                 {section === 'releases' && (
                   <SectionShell
                     title="Releases"
-                    description="Defaults applied to the Watching view."
+                    description="Defaults applied to the Following view."
                   >
                     <Field label="Default release platform">
                       <select
@@ -406,7 +421,7 @@ export function SettingsView({ onBack }: Props) {
                         <option value="linux">Linux</option>
                       </select>
                       <p className="text-xs text-muted mt-1.5">
-                        Filters release assets by platform in the Watching view.
+                        Filters release assets by platform in the Following view.
                       </p>
                     </Field>
                   </SectionShell>

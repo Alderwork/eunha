@@ -355,7 +355,7 @@ export async function invoke<T>(cmd: string, args?: Record<string, any>): Promis
 			return {
 				pat_set: true,
 				pat_masked: 'ghp_••••••••••••••••',
-				output_language: 'en',
+				output_language: 'English',
 				default_release_platform: 'macos-arm64',
 				show_tray_icon: true,
 				star_sync_interval_minutes: '360',
@@ -371,7 +371,10 @@ export async function invoke<T>(cmd: string, args?: Record<string, any>): Promis
 		case 'validate_pat':
 			previewOnly('PAT validation');
 		case 'get_my_github_login':
-			return 'preview-user' as T;
+			return {
+				login: 'preview-user',
+				avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4',
+			} as T;
 		case 'sync_stars':
 			previewOnly('Star sync');
 		case 'export_database':

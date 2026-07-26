@@ -4,6 +4,8 @@ import { Welcome } from './scenes/Welcome';
 import { ConnectGitHub } from './scenes/ConnectGitHub';
 import { ImportStars } from './scenes/ImportStars';
 import { Done } from './scenes/Done';
+import { ReviewSuggestions } from './scenes/ReviewSuggestions';
+import { FollowRecentStars } from './scenes/FollowRecentStars';
 import {
   CONNECT_IDLE, CONNECT_VALIDATED,
   IMPORT_PEAK, IMPORT_CALMED, IMPORT_DONE, DONE as DONE_PRESET,
@@ -14,7 +16,7 @@ export type OnboardingCompleteOpts = {
   openAddModal?: boolean;
 };
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
 export function OnboardingFlow({
   onComplete,
@@ -75,6 +77,8 @@ export function OnboardingFlow({
     setSceneSafe(IMPORT_CALMED, 800);
   }
 
+  function goToStep5() { setStep(5); }
+  function goToStep6() { setStep(6); }
   function exitToManual() {
     onComplete({ openAddModal: true });
   }
@@ -109,7 +113,9 @@ export function OnboardingFlow({
               onContinue={goToStep4}
             />
           )}
-          {step === 4 && <Done onContinue={exitToLibrary} />}
+          {step === 4 && <ReviewSuggestions onContinue={goToStep5} />}
+          {step === 5 && <FollowRecentStars onContinue={goToStep6} />}
+          {step === 6 && <Done onContinue={exitToLibrary} />}
         </div>
       </main>
     </div>

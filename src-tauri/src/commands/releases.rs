@@ -453,14 +453,8 @@ pub fn list_watched_repos_with_unread(
 ) -> Result<Vec<WatchedRepoEntry>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare(
-            "SELECT r.id, r.full_name, r.description, r.url, r.language, r.stars_count,
-                    r.topics, r.added_at, r.source, r.llm_summary, r.llm_what, r.llm_why,
-                    r.llm_use_case, r.llm_category, r.llm_tags, r.llm_generated_at,
-                    r.prompt_version, r.user_notes, r.user_category, r.watching,
-                    r.category_locked,
-                    COALESCE(u.cnt, 0) AS unread
-             FROM repos r
+        .prepare(&format!(
+            "{}
              LEFT JOIN (
                  SELECT repo_id, COUNT(*) AS cnt
                  FROM releases
@@ -469,13 +463,16 @@ pub fn list_watched_repos_with_unread(
              ) u ON u.repo_id = r.id
              WHERE r.watching = 1
              ORDER BY unread DESC, r.full_name ASC",
-        )
+            crate::commands::describe::REPO_SELECT
+                .replace("repos.id", "r.id")
+                .replace("FROM repos", ", COALESCE(u.cnt, 0) AS unread FROM repos r")
+        ))
         .map_err(|e| e.to_string())?;
 
     let entries: Vec<WatchedRepoEntry> = stmt
         .query_map([], |row| {
             let repo = repo_from_row(row)?;
-            let unread: i64 = row.get(21)?;
+            let unread: i64 = row.get(26)?;
             Ok(WatchedRepoEntry { repo, unread })
         })
         .map_err(|e| e.to_string())?

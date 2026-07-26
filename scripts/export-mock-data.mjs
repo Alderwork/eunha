@@ -51,6 +51,14 @@ const feedItems = q(`
   FROM feed_items WHERE dismissed = 0 ORDER BY starred_at DESC LIMIT 200
 `);
 
+// SQLite stores booleans as 0/1; the real backend serializes them as JSON
+// booleans. Match that or React renders literal "0" for `{x && ...}` guards.
+for (const r of repos) {
+	r.watching = !!r.watching;
+	r.category_locked = !!r.category_locked;
+}
+for (const c of collections) c.is_read_later = !!c.is_read_later;
+
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(
 	out,

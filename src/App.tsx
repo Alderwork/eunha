@@ -5,7 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
-import { Repo, CategoryCount, AppConstants, BatchDescribeProgress, BatchDescribeResult, DigestBatch, Collection, SyncStarsResult } from './types';
+import { Repo, CategoryCount, AppConstants, BatchDescribeProgress, BatchDescribeResult, DigestBatch, Collection, SyncStarsResult, Purpose, UserTag } from './types';
 import { useKeydown } from './hooks/useKeydown';
 import { RepoRowDense } from './components/repo-views/RepoRowDense';
 import { RepoRowComfy } from './components/repo-views/RepoRowComfy';
@@ -43,15 +43,19 @@ export default function App() {
   const [categories, setCategories] = useState<CategoryCount[]>([]);
   const [constants, setConstants] = useState<AppConstants>({ current_prompt_version: 1 });
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [userTags, setUserTags] = useState<UserTag[]>([]);
+  const [purposes, setPurposes] = useState<Purpose[]>([]);
 
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedCollection, setSelectedCollection] = useState<number | null>(null);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedPurpose, setSelectedPurpose] = useState<string | null>(null);
   const [showCollectionMenu, setShowCollectionMenu] = useState(false);
   const [aiStatus, setAiStatus] = useState<'undescribed' | 'stale' | 'described' | null>(null);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [modal, setModal] = useState<Modal>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('library');
+  const [viewMode, setViewMode] = useState<ViewMode>('watching');
 
   const [describing, setDescribing] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -179,8 +183,12 @@ export default function App() {
           aiStatus,
         });
       }
-      setRepos(data);
-      setSelectedIdx((i) => Math.min(i, Math.max(data.length - 1, 0)));
+      const filtered = data.filter((repo) =>
+        (!selectedTag || repo.user_tags?.includes(selectedTag)) &&
+        (!selectedPurpose || repo.purposes?.includes(selectedPurpose))
+      );
+      setRepos(filtered);
+      setSelectedIdx((i) => Math.min(i, Math.max(filtered.length - 1, 0)));
     } catch (e) {
       console.error(e);
     }
@@ -193,6 +201,15 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
+  }
+
+  async function loadClassificationOptions() {
+    try {
+      const [tags, savedPurposes] = await Promise.all([
+        invoke<UserTag[]>('list_user_tags'), invoke<Purpose[]>('list_purposes'),
+      ]);
+      setUserTags(tags); setPurposes(savedPurposes);
+    } catch { /* optional library filters */ }
   }
 
   async function toggleReadLater(repo: Repo) {
@@ -253,9 +270,10 @@ export default function App() {
 
     invoke<AppConstants>('get_app_constants').then(setConstants);
 
-    invoke<{ pat_set: boolean }>('get_settings')
+    invoke<{ pat_set: boolean; default_home?: 'watching' | 'library' }>('get_settings')
       .then((s) => {
         if (!s.pat_set) setPatMissing(true);
+        if (s.default_home === 'library') setViewMode('library');
       })
       .catch((e) => {
         setKeychainError(`Could not read credentials from keychain — open Settings to re-enter. (${e})`);
@@ -264,6 +282,7 @@ export default function App() {
     loadRepos();
     loadCategories();
     loadCollections();
+    loadClassificationOptions();
     loadUnreadCount();
     loadFeedUnreadCount();
     invoke('backfill_owner_avatars').then(() => loadRepos()).catch(() => {});
@@ -280,7 +299,7 @@ export default function App() {
 
   useEffect(() => {
     loadRepos();
-  }, [query, selectedCategory, aiStatus, selectedCollection]);
+  }, [query, selectedCategory, aiStatus, selectedCollection, selectedTag, selectedPurpose]);
 
   useEffect(() => {
     loadFeedUnreadCount();
@@ -426,7 +445,7 @@ export default function App() {
     try {
       const updated = await invoke<Repo>('toggle_watching', { repoId: repo.id });
       setRepos((rs) => rs.map((r) => (r.id === updated.id ? updated : r)));
-      showToast(updated.watching ? `Watching ${repo.full_name}` : `Unwatched ${repo.full_name}`);
+      showToast(updated.watching ? `Following ${repo.full_name}` : `Unfollowed ${repo.full_name}`);
     } catch (e) {
       showToast(`Failed: ${e}`, 'error');
     }
@@ -789,6 +808,8 @@ export default function App() {
     } catch (e) {
       showToast(`Could not save onboarding state — ${e}`, 'error');
     }
+    loadRepos();
+    loadClassificationOptions();
     if (opts.openAddModal) {
       setPendingAddModal(true);
     }
@@ -959,7 +980,7 @@ export default function App() {
               },
               {
                 key: 'watching' as ViewMode,
-                label: 'Watching',
+                label: 'Following',
                 badge: unreadCount > 0 ? unreadCount : undefined,
                 icon: (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1204,6 +1225,15 @@ export default function App() {
                 onAiStatusChange={setAiStatus}
                 trailing={<VariantToggle value={viewVariant} onChange={setViewVariant} />}
               />
+              <div className="flex gap-2 px-3 py-2 border-b border-border bg-panel">
+                <select value={selectedTag ?? ''} onChange={(e) => setSelectedTag(e.target.value || null)} className="text-xs bg-bg border border-border rounded px-2 py-1 text-dim">
+                  <option value="">All tags</option>{userTags.map(tag => <option key={tag.id} value={tag.name}>{tag.name}</option>)}
+                </select>
+                <select value={selectedPurpose ?? ''} onChange={(e) => setSelectedPurpose(e.target.value || null)} className="text-xs bg-bg border border-border rounded px-2 py-1 text-dim">
+                  <option value="">All purposes</option>{purposes.map(purpose => <option key={purpose.id} value={purpose.name}>{purpose.name}</option>)}
+                </select>
+                {(selectedTag || selectedPurpose) && <button className="text-xs text-muted hover:text-ink" onClick={() => { setSelectedTag(null); setSelectedPurpose(null); }}>Clear filters</button>}
+              </div>
 
               {describing.size > 0 && (
                 <div

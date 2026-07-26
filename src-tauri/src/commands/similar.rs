@@ -92,7 +92,7 @@ pub fn get_similar_repos(
     // Find candidates with same non-null llm_category, described, excluding self
     let sql = format!(
         "{} r WHERE r.llm_category IS NOT NULL AND r.llm_what IS NOT NULL AND r.id != ?1",
-        REPO_SELECT.replace("FROM repos", "FROM repos r")
+        REPO_SELECT.replace("repos.id", "r.id").replace("FROM repos", "FROM repos r")
     );
     let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
     let candidates: Vec<Repo> = stmt

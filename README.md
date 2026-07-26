@@ -14,7 +14,8 @@ A local-first, keyboard-first desktop app for building a personal GitHub repo li
 - **LLM descriptions** — on-demand summaries via OpenAI, Anthropic, or Ollama (what / why / use-case / tags)
 - **Full-text search** — FTS5-powered search across summaries, tags, and notes
 - **Keyboard-first navigation** — j/k, gg/G, /, o — no mouse required
-- **Watching list** — track releases for repos you actively use
+- **팔로우 업데이트** — 최근 Star 중 직접 고른 프로젝트만 릴리스를 추적하고, 릴리스 노트를 열면 읽음 처리합니다
+- **Star 맥락 복원** — 태그와 저장 목적(복수 선택)으로 Star를 다시 찾습니다. `Collections`는 GitHub Star List가 아닌 Eunha의 로컬 컬렉션입니다.
 - **Network feed** — see what repos your network is starring
 - **Batch describe** — describe all undescribed repos in one shot (shift-A)
 - **Edit notes & categories** — override LLM output with your own context
@@ -92,6 +93,14 @@ Rust (src-tauri/src/commands/)
 ```
 
 All GitHub API calls and DB writes happen in Rust. The React frontend never talks to GitHub or SQLite directly.
+
+## Star management v1
+
+Eunha mirrors the complete GitHub Star list and never stars or unstars a repository on your behalf. A repository removed from GitHub is removed from Eunha on the next successful full sync, including its local classification, follow state, and cached releases. GitHub's actual star timestamp is retained to make the “recent 10” follow recommendations reliable.
+
+The onboarding flow is GitHub connection → full Star sync → rule-based suggestion review → optional follow selection → finish. Suggestions begin with language and GitHub topics; any LLM enrichment remains user-initiated and is separate from the existing description prompt.
+
+GitHub Star Lists are intentionally not synchronized in v1. GitHub documents the feature as a public preview, while the official Starring API does not expose list CRUD or membership synchronization: [Star Lists](https://docs.github.com/en/enterprise-cloud%40latest/get-started/exploring-projects-on-github/saving-repositories-with-stars) · [Starring API](https://docs.github.com/en/rest/activity/starring?apiVersion=2026-03-10).
 
 ## License
 

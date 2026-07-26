@@ -22,8 +22,8 @@ const LIBRARY = [
   ['/', 'Focus search'],
   ['e', 'Edit notes'],
   ['r', 'Open README tab'],
-  ['w', 'Toggle watching'],
-  ['W', 'Watching list'],
+  ['w', 'Toggle follow'],
+  ['W', 'Following list'],
   ['f', 'Stars feed'],
   [',', 'Settings'],
   ['?', 'Help'],
@@ -114,7 +114,7 @@ export function KeybindingHelp({ onClose }: Props) {
         <div className="flex gap-5">
           <Section title="Library" bindings={LIBRARY} />
           <div className="w-px bg-border shrink-0" />
-          <Section title="Watching" bindings={WATCHING} />
+          <Section title="Following" bindings={WATCHING} />
           <div className="w-px bg-border shrink-0" />
           <Section title="Feed" bindings={FEED} />
         </div>

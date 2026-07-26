@@ -49,12 +49,15 @@ pub struct SelectedItem {
     pub score: f64,
 }
 
-// 22 repo columns in repo_from_row order, prefixed for the JOIN.
+// Repo columns in repo_from_row order, prefixed for the JOIN.
 const REPO_COLS_PREFIXED: &str =
     "repos.id, repos.full_name, repos.description, repos.url, repos.language, repos.stars_count, \
      repos.topics, repos.added_at, repos.source, repos.llm_summary, repos.llm_what, repos.llm_why, \
      repos.llm_use_case, repos.llm_category, repos.llm_tags, repos.llm_generated_at, repos.prompt_version, \
-     repos.user_notes, repos.user_category, repos.watching, repos.category_locked, repos.owner_avatar_url";
+     repos.user_notes, repos.user_category, repos.watching, repos.category_locked, repos.owner_avatar_url, repos.starred_at, \
+     COALESCE((SELECT json_group_array(name) FROM user_tags ut JOIN repo_tags rt ON rt.tag_id=ut.id WHERE rt.repo_id=repos.id), '[]'), \
+     COALESCE((SELECT json_group_array(name) FROM purposes p JOIN repo_purposes rp ON rp.purpose_id=p.id WHERE rp.repo_id=repos.id), '[]'), \
+     COALESCE((SELECT status FROM classification_suggestions cs WHERE cs.repo_id=repos.id), 'pending')";
 
 /// Phase 1: score eligible repos in SQL across forgotten/undescribed/serendipity/fatigue.
 /// Weights are bound params so tests can zero out serendipity for determinism.
@@ -91,8 +94,8 @@ pub fn select_candidates(conn: &Connection, w: &Weights, pool: usize) -> rusqlit
         params![w.forgotten, w.undescribed, w.serendipity, w.fatigue, engagement_weight, COOLDOWN_DAYS, pool as i64],
         |row| {
             let repo = repo_from_row(row)?;
-            let base_score: f64 = row.get(22)?;
-            let forgotten_months: i64 = row.get(23)?;
+            let base_score: f64 = row.get(26)?;
+            let forgotten_months: i64 = row.get(27)?;
             Ok(Candidate { repo, base_score, forgotten_months })
         },
     )?;
@@ -208,9 +211,9 @@ pub fn read_current_batch(conn: &Connection) -> Option<DigestBatch> {
     let items: Vec<DigestItem> = stmt
         .query_map(params![batch_date], |row| {
             let repo = repo_from_row(row)?;
-            let reason: String = row.get(22)?;
-            let reason_detail: Option<String> = row.get(23)?;
-            let action: Option<String> = row.get(24)?;
+            let reason: String = row.get(26)?;
+            let reason_detail: Option<String> = row.get(27)?;
+            let action: Option<String> = row.get(28)?;
             Ok(DigestItem { repo, reason, reason_detail: reason_detail.unwrap_or_default(), action })
         })
         .ok()?
@@ -414,6 +417,7 @@ mod tests {
             llm_tags: None, llm_generated_at: None, prompt_version: None,
             user_notes: None, user_category: None, watching: false,
             category_locked: false, owner_avatar_url: None,
+            starred_at: None, user_tags: vec![], purposes: vec![], classification_status: "pending".to_string(),
         }
     }
 

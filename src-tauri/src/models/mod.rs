@@ -36,6 +36,24 @@ pub struct Repo {
     pub watching: bool,
     pub category_locked: bool,
     pub owner_avatar_url: Option<String>,
+    /// Timestamp supplied by GitHub's starred API, not Eunha's import time.
+    pub starred_at: Option<String>,
+    pub user_tags: Vec<String>,
+    pub purposes: Vec<String>,
+    pub classification_status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserTag { pub id: i64, pub name: String }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Purpose { pub id: i64, pub name: String, pub is_default: bool }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClassificationSuggestion {
+    pub repo: Repo,
+    pub suggested_tags: Vec<String>,
+    pub suggested_purposes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

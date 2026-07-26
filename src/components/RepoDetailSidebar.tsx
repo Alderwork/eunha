@@ -168,7 +168,7 @@ function RepoBody({
                 <span className="text-faint">uncategorized</span>
               )}
               {repo.watching && (
-                <span className="text-success" title="Watching releases">●</span>
+                <span className="text-success" title="Following releases">●</span>
               )}
             </div>
           </div>
@@ -324,7 +324,7 @@ function RepoBody({
       <div className="px-4 py-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted">
         <span className="flex items-center gap-1"><Kbd>d</Kbd> describe</span>
         <span className="flex items-center gap-1"><Kbd>r</Kbd> readme</span>
-        <span className="flex items-center gap-1"><Kbd>w</Kbd> {repo.watching ? 'unwatch' : 'watch'}</span>
+        <span className="flex items-center gap-1"><Kbd>w</Kbd> {repo.watching ? 'unfollow' : 'follow'}</span>
         <span className="flex items-center gap-1"><Kbd>m</Kbd> read later</span>
         <span className="flex items-center gap-1"><Kbd>o</Kbd> open</span>
         <span className="flex items-center gap-1"><Kbd>i</Kbd> close</span>
