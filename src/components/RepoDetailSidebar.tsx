@@ -54,7 +54,7 @@ export function RepoDetailSidebar({
   onClose,
 }: Props) {
   return (
-    <aside className="flex flex-col h-full w-80 flex-shrink-0 border-l border-border bg-panel overflow-hidden">
+    <aside className="eunha-detail-sidebar flex flex-col h-full w-80 flex-shrink-0 border-l border-border bg-panel overflow-hidden">
       <div className="flex-shrink-0 flex items-center justify-between px-4 h-9 border-b border-border">
         <span className="text-[10px] font-mono uppercase tracking-wider text-faint">Detail</span>
         <button

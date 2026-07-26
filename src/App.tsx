@@ -964,9 +964,9 @@ export default function App() {
         </div>
       </div>
 
-      <main className="flex flex-row flex-1 overflow-hidden">
+      <main className="eunha-workspace flex flex-row flex-1 overflow-hidden">
         {/* Left sidebar */}
-        <aside className="flex-shrink-0 w-40 border-r border-border bg-panel flex flex-col pt-2 pb-4">
+        <aside className="eunha-app-sidebar flex-shrink-0 w-40 border-r border-border bg-panel flex flex-col pt-2 pb-4">
           {(
             [
               {
@@ -1029,9 +1029,9 @@ export default function App() {
               }`}
             >
               {icon}
-              <span className="flex-1 text-left">{label}</span>
+              <span className="eunha-nav-label flex-1 text-left">{label}</span>
               {badge !== undefined && (
-                <span className="bg-accent text-[10px] font-semibold text-bg rounded-full px-1 min-w-[16px] text-center leading-4">
+                <span className="eunha-nav-badge bg-accent text-[10px] font-semibold text-bg rounded-full px-1 min-w-[16px] text-center leading-4">
                   {badge > 99 ? '99+' : badge}
                 </span>
               )}
@@ -1050,8 +1050,8 @@ export default function App() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
               </svg>
-              <span className="flex-1 text-left">README</span>
-              <span className="bg-accent text-[10px] font-semibold text-bg rounded-full px-1 min-w-[16px] text-center leading-4">
+              <span className="eunha-nav-label flex-1 text-left">README</span>
+              <span className="eunha-nav-badge bg-accent text-[10px] font-semibold text-bg rounded-full px-1 min-w-[16px] text-center leading-4">
                 {readmeTabs.length}
               </span>
             </button>
@@ -1126,12 +1126,12 @@ export default function App() {
           })}
         </div>
       )}
-      <div ref={splitContainerRef} className="flex flex-row flex-1 overflow-hidden">
+      <div ref={splitContainerRef} className="eunha-split-container flex flex-row flex-1 overflow-hidden">
         {/* LEFT PANE */}
         <div
           style={splitPane ? { width: `${splitRatio * 100}%` } : undefined}
           onClick={splitPane ? () => setFocusedSide('left') : undefined}
-          className={`flex flex-col overflow-hidden ${splitPane ? '' : 'flex-1'} ${
+          className={`eunha-primary-pane flex flex-col overflow-hidden ${splitPane ? '' : 'flex-1'} ${
             splitPane && focusedSide === 'left' ? 'ring-1 ring-accent ring-inset' : ''
           }`}
         >
@@ -1353,11 +1353,11 @@ export default function App() {
           <>
             <div
               onMouseDown={handleGutterMouseDown}
-              className="w-1 bg-border hover:bg-accent cursor-col-resize flex-shrink-0"
+              className="eunha-split-gutter w-1 bg-border hover:bg-accent cursor-col-resize flex-shrink-0"
             />
             <div
               onClick={() => setFocusedSide('right')}
-              className={`flex flex-col overflow-hidden flex-1 min-w-0 ${
+              className={`eunha-secondary-pane flex flex-col overflow-hidden flex-1 min-w-0 ${
                 focusedSide === 'right' ? 'ring-1 ring-accent ring-inset' : ''
               }`}
             >
