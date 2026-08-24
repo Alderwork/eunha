@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import type { Project, ProjectDraft } from './types';
+import type { ContributionBrief, Project, ProjectContribution, ProjectDraft } from './types';
 
 type Screen = 'projects' | 'tasks' | 'maintain' | 'settings';
 type Role = Project['role_mode'];
@@ -94,6 +94,84 @@ function ProjectList({ projects, selectedId, onSelect, onAdd }: { projects: Proj
   </aside>;
 }
 
+function BriefList({ title, items, tone }: { title: string; items: string[]; tone?: 'warning' | 'unknown' }) {
+  if (items.length === 0) return null;
+  return <section className={`pivot-brief-list ${tone ?? ''}`}><h4>{title}</h4><ul>{items.map((item) => <li key={item}>{item}</li>)}</ul></section>;
+}
+
+function ContributionDocument({ brief }: { brief: ContributionBrief }) {
+  return <article className="pivot-brief-document">
+    <header><span className="pivot-index">VERIFIED BRIEF</span><p>{brief.project_definition}</p></header>
+    <div className="pivot-brief-columns">
+      <BriefList title="Contributor entry points" items={brief.contributor_entry_points} />
+      <BriefList title="Setup requirements" items={brief.setup_requirements} />
+      <BriefList title="Contribution rules" items={brief.contribution_rules} />
+      <BriefList title="Maturity signals" items={brief.maturity_signals} />
+      <BriefList title="Cautions" items={brief.cautions} tone="warning" />
+      <BriefList title="Unknowns" items={brief.unknowns} tone="unknown" />
+    </div>
+    {brief.verification_commands.length > 0 && <section className="pivot-command-ledger"><h4>Detected verification commands</h4><div>{brief.verification_commands.map((command) => <code key={command}><span>$</span>{command}</code>)}</div><small>Detected only. Nothing runs without a separate confirmation.</small></section>}
+    <section className="pivot-evidence-ledger"><div><h4>Evidence ledger</h4><span>{brief.evidence.length} verified excerpts</span></div>{brief.evidence.length === 0 ? <p>No verifiable excerpt was available.</p> : brief.evidence.map((item, index) => <blockquote key={`${item.source}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><div><p>“{item.excerpt}”</p><cite>{item.source}</cite></div></blockquote>)}</section>
+  </article>;
+}
+
+function ContributionWorkspace({ project }: { project: Project }) {
+  const [data, setData] = useState<ProjectContribution | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [issueFilter, setIssueFilter] = useState<'entry' | 'issues' | 'prs'>('entry');
+
+  useEffect(() => {
+    setLoading(true); setError(null); setData(null);
+    void invoke<ProjectContribution | null>('get_project_contribution', { projectId: project.id })
+      .then(setData)
+      .catch((reason) => setError(String(reason)))
+      .finally(() => setLoading(false));
+  }, [project.id]);
+
+  async function analyze() {
+    setAnalyzing(true); setError(null);
+    try { setData(await invoke<ProjectContribution>('analyze_project_contribution', { projectId: project.id })); }
+    catch (reason) { setError(String(reason)); }
+    finally { setAnalyzing(false); }
+  }
+
+  if (loading) return <section className="pivot-contribution-loading"><span /><p>Reading the latest saved evidence…</p></section>;
+  if (!data) return <section className="pivot-contribution-empty">
+    <div><span className="pivot-index">02 / CONTRIBUTION BRIEF</span><h3>Turn repository facts into an entry point.</h3><p>Collect README, contribution policy, templates, manifests, and the latest public GitHub issues. Selected excerpts are sent to your configured AI provider only when you start this analysis.</p></div>
+    {error && <p className="pivot-error">{error}</p>}
+    <button className="pivot-primary" onClick={() => void analyze()} disabled={analyzing}>{analyzing ? 'Collecting evidence…' : 'Collect evidence & build brief'}</button>
+  </section>;
+
+  const snapshot = data.snapshot;
+  const brief = snapshot.contribution_brief;
+  const issues = data.issues.filter((issue) => {
+    if (issueFilter === 'prs') return issue.is_pull_request;
+    if (issueFilter === 'issues') return !issue.is_pull_request;
+    return !issue.is_pull_request && issue.labels.some((label) => ['good first issue', 'help wanted'].includes(label.toLowerCase()));
+  });
+  const sources = [
+    { label: 'README', ready: snapshot.readme != null },
+    { label: 'CONTRIBUTING', ready: snapshot.contributing != null },
+    { label: 'CODE OF CONDUCT', ready: snapshot.code_of_conduct != null },
+    { label: 'TEMPLATES', ready: snapshot.templates.length > 0, count: snapshot.templates.length },
+    { label: 'TOOLING', ready: snapshot.detected_tools.length > 0, count: snapshot.detected_tools.length },
+  ];
+
+  return <section className="pivot-contribution-workspace">
+    <header className="pivot-contribution-head"><div><span className="pivot-index">02 / CONTRIBUTION BRIEF</span><h3>Evidence before advice.</h3><p>Snapshot {shortSha(snapshot.commit_sha)} · captured {new Date(snapshot.captured_at).toLocaleString()}</p></div><button onClick={() => void analyze()} disabled={analyzing}>{analyzing ? 'Collecting…' : 'Refresh evidence'}</button></header>
+    {error && <div className="pivot-inline-error">{error}</div>}
+    {snapshot.collection_errors.length > 0 && <details className="pivot-partial"><summary><span>PARTIAL RESULT</span>{snapshot.collection_errors.length} source or analysis warning(s)</summary><ul>{snapshot.collection_errors.map((item) => <li key={item}>{item}</li>)}</ul></details>}
+    <div className="pivot-source-strip">{sources.map((source) => <div key={source.label} className={source.ready ? 'ready' : ''}><i /> <span>{source.label}</span><b>{source.ready ? source.count ?? 'FOUND' : 'MISSING'}</b></div>)}</div>
+    {brief ? <ContributionDocument brief={brief} /> : <div className="pivot-inline-error">The snapshot was saved without a valid Contribution Brief.</div>}
+    <section className="pivot-issues">
+      <header><div><span className="pivot-index">03 / PUBLIC ACTIVITY</span><h3>Choose a tractable entry point.</h3></div><div className="pivot-issue-filters">{([['entry', 'Entry issues'], ['issues', 'All issues'], ['prs', 'Pull requests']] as const).map(([value, label]) => <button key={value} className={issueFilter === value ? 'active' : ''} onClick={() => setIssueFilter(value)}>{label}</button>)}</div></header>
+      {issues.length === 0 ? <div className="pivot-issues-empty">No matching item was found in the latest cached GitHub sample.</div> : <div className="pivot-issue-list">{issues.map((issue) => <button key={issue.github_issue_id} onClick={() => void openUrl(issue.html_url)}><span className="pivot-issue-number">{issue.is_pull_request ? 'PR' : 'ISSUE'} #{issue.number}</span><div><strong>{issue.title}</strong><span>{issue.labels.map((label) => <i key={label}>{label}</i>)}</span></div><small>{issue.comments_count} comments<br />{issue.author_login ? `@${issue.author_login}` : ''}</small><b>↗</b></button>)}</div>}
+    </section>
+  </section>;
+}
+
 function ProjectOverview({ project, onProjectChange }: { project: Project; onProjectChange: (project: Project) => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,11 +206,7 @@ function ProjectOverview({ project, onProjectChange }: { project: Project; onPro
         {!status?.clean && <div className="pivot-change-list">{status?.changed_files.slice(0, 6).map((file) => <code key={file}>{file}</code>)}{(status?.changed_files.length ?? 0) > 6 && <span>+{(status?.changed_files.length ?? 0) - 6} more</span>}</div>}
       </div> : <div className="pivot-connect-callout"><div><strong>No filesystem access granted.</strong><p>Connect an existing clone by adding its local path. Clone execution will arrive with a separate confirmation step.</p></div><span>READ-ONLY</span></div>}
     </section>
-    <div className="pivot-overview-grid">
-      <section className="pivot-brief-preview"><span className="pivot-index">02 / CONTRIBUTION BRIEF</span><h3>Evidence before advice.</h3><p>README, CONTRIBUTING, templates, and manifests will be collected in Phase 2. Every recommendation will link back to a file or GitHub source.</p><div className="pivot-evidence-slots"><span>README <i>queued</i></span><span>CONTRIBUTING <i>queued</i></span><span>ISSUE TEMPLATES <i>queued</i></span><span>MANIFESTS <i>queued</i></span></div>
-      </section>
-      <section className="pivot-next-actions"><span className="pivot-index">NEXT ACTIONS</span><ol><li className={workspace ? 'done' : ''}><span>1</span><div><strong>Connect local workspace</strong><small>{workspace ? 'Git root verified' : 'Add an existing clone path'}</small></div></li><li><span>2</span><div><strong>Build contribution brief</strong><small>Available in Phase 2</small></div></li><li><span>3</span><div><strong>Select an issue</strong><small>Available in Phase 3</small></div></li></ol></section>
-    </div>
+    <ContributionWorkspace project={project} />
   </main>;
 }
 

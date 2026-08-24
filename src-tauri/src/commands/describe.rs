@@ -227,7 +227,7 @@ fn require_model<'a>(model: Option<&'a str>, provider: &str) -> Result<&'a str, 
         .ok_or_else(|| format!("No model selected for {provider}. Open Settings (,) and pick a default model."))
 }
 
-async fn call_llm(prompt: &str, settings: &LlmSettings) -> Result<String, String> {
+pub(crate) async fn call_llm(prompt: &str, settings: &LlmSettings) -> Result<String, String> {
     let client = reqwest::Client::new();
     let api_key = settings.api_key.as_str();
     let model = settings.model.as_deref().filter(|m| !m.is_empty());
@@ -270,7 +270,7 @@ async fn call_llm(prompt: &str, settings: &LlmSettings) -> Result<String, String
         "anthropic" => {
             let body = serde_json::json!({
                 "model": model.unwrap_or(DEFAULT_ANTHROPIC_MODEL),
-                "max_tokens": 500,
+                "max_tokens": 1500,
                 "messages": [{"role": "user", "content": prompt}]
             });
             let resp = client

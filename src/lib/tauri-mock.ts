@@ -15,6 +15,7 @@ import type {
 	Collection,
 	FeedGroup,
 	Project,
+	ProjectContribution,
 	ProjectDraft,
 	Repo,
 	SimilarRepo,
@@ -59,6 +60,7 @@ const previewProjects: Project[] = [
 		remote_url: 'https://github.com/openai/codex',
 		display_name: 'codex',
 		description: 'Lightweight coding agent that runs in your terminal.',
+		default_branch: 'main',
 		role_mode: 'contributor',
 		created_at: '2026-08-24 09:00:00',
 		updated_at: '2026-08-24 09:00:00',
@@ -224,9 +226,44 @@ export async function invoke<T>(cmd: string, args?: Record<string, any>): Promis
 		}
 		case 'save_project': {
 			const draft = a.draft as ProjectDraft;
-			const project: Project = { id: draft.github_full_name ? `github:${draft.github_full_name}` : `local:${draft.local_path}`, github_full_name: draft.github_full_name, remote_url: draft.remote_url, display_name: draft.display_name, description: draft.description, role_mode: a.roleMode, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), workspace: null };
+			const project: Project = { id: draft.github_full_name ? `github:${draft.github_full_name}` : `local:${draft.local_path}`, github_full_name: draft.github_full_name, remote_url: draft.remote_url, display_name: draft.display_name, description: draft.description, default_branch: draft.default_branch, role_mode: a.roleMode, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), workspace: null };
 			previewProjects.unshift(project);
 			return project as T;
+		}
+		case 'get_project_contribution':
+		case 'analyze_project_contribution': {
+			const projectId = String(a.projectId);
+			return {
+				snapshot: {
+					project_id: projectId,
+					commit_sha: '5d91a7430a18dc21',
+					readme: '# Codex\nA lightweight coding agent.',
+					contributing: 'Run cargo test before opening a pull request.',
+					code_of_conduct: null,
+					templates: [{ source: '.github/ISSUE_TEMPLATE/bug.yml', content: 'name: Bug report' }],
+					detected_tools: [{ source: 'Cargo.toml', name: 'Rust / Cargo', commands: ['cargo test', 'cargo fmt --check', 'cargo clippy --all-targets'] }],
+					evidence: [{ source: 'CONTRIBUTING.md', excerpt: 'Run cargo test before opening a pull request.' }],
+					contribution_brief: {
+						project_definition: 'A lightweight coding agent that runs in the terminal and helps developers work with repositories.',
+						contributor_entry_points: ['Start with CONTRIBUTING.md.', 'Review open issues labeled good first issue or help wanted.'],
+						setup_requirements: ['Rust / Cargo configuration is declared in Cargo.toml.'],
+						verification_commands: ['cargo test', 'cargo fmt --check', 'cargo clippy --all-targets'],
+						contribution_rules: ['Run the documented checks before opening a pull request.'],
+						maturity_signals: ['The current GitHub sample contains 2 open issues and 1 open pull request.'],
+						cautions: ['The code of conduct was not found in the collected sources.'],
+						evidence: [{ source: 'CONTRIBUTING.md', excerpt: 'Run cargo test before opening a pull request.' }, { source: 'README.md', excerpt: 'A lightweight coding agent.' }],
+						unknowns: ['Required Rust toolchain version was not stated in the collected excerpts.'],
+					},
+					collection_errors: ['CODE_OF_CONDUCT was not found.'],
+					captured_at: new Date().toISOString(),
+					generated_at: new Date().toISOString(),
+				},
+				issues: [
+					{ github_issue_id: 101, project_id: projectId, number: 8421, title: 'Improve first-run setup diagnostics', body: 'Make setup failures actionable.', html_url: 'https://github.com/openai/codex/issues/8421', labels: ['good first issue', 'help wanted'], state: 'open', author_login: 'maintainer', is_pull_request: false, comments_count: 4, updated_at: new Date().toISOString() },
+					{ github_issue_id: 102, project_id: projectId, number: 8390, title: 'Document local model configuration', body: null, html_url: 'https://github.com/openai/codex/issues/8390', labels: ['documentation'], state: 'open', author_login: 'contributor', is_pull_request: false, comments_count: 2, updated_at: new Date().toISOString() },
+					{ github_issue_id: 103, project_id: projectId, number: 8401, title: 'Refine command approval messaging', body: null, html_url: 'https://github.com/openai/codex/pull/8401', labels: ['ui'], state: 'open', author_login: 'contributor', is_pull_request: true, comments_count: 6, updated_at: new Date().toISOString() },
+				],
+			} as ProjectContribution as T;
 		}
 		// ── Library ──────────────────────────────────────────
 		case 'list_repos': {

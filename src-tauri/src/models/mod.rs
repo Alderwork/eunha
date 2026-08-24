@@ -30,6 +30,7 @@ pub struct Project {
     pub remote_url: Option<String>,
     pub display_name: String,
     pub description: Option<String>,
+    pub default_branch: Option<String>,
     pub role_mode: String,
     pub created_at: String,
     pub updated_at: String,
@@ -47,6 +48,76 @@ pub struct ProjectDraft {
     pub workspace_status: Option<GitStatusSummary>,
     pub default_branch: Option<String>,
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceDocument {
+    pub source: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DetectedTool {
+    pub source: String,
+    pub name: String,
+    pub commands: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BriefEvidence {
+    pub source: String,
+    pub excerpt: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContributionBrief {
+    pub project_definition: String,
+    pub contributor_entry_points: Vec<String>,
+    pub setup_requirements: Vec<String>,
+    pub verification_commands: Vec<String>,
+    pub contribution_rules: Vec<String>,
+    pub maturity_signals: Vec<String>,
+    pub cautions: Vec<String>,
+    pub evidence: Vec<BriefEvidence>,
+    pub unknowns: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectSnapshot {
+    pub project_id: String,
+    pub commit_sha: Option<String>,
+    pub readme: Option<String>,
+    pub contributing: Option<String>,
+    pub code_of_conduct: Option<String>,
+    pub templates: Vec<SourceDocument>,
+    pub detected_tools: Vec<DetectedTool>,
+    pub evidence: Vec<BriefEvidence>,
+    pub contribution_brief: Option<ContributionBrief>,
+    pub collection_errors: Vec<String>,
+    pub captured_at: String,
+    pub generated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectIssue {
+    pub github_issue_id: i64,
+    pub project_id: String,
+    pub number: i64,
+    pub title: String,
+    pub body: Option<String>,
+    pub html_url: String,
+    pub labels: Vec<String>,
+    pub state: String,
+    pub author_login: Option<String>,
+    pub is_pull_request: bool,
+    pub comments_count: i64,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectContribution {
+    pub snapshot: ProjectSnapshot,
+    pub issues: Vec<ProjectIssue>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
