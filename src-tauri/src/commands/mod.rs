@@ -13,6 +13,7 @@ pub mod library;
 pub mod onboarding;
 pub mod project_brief;
 pub mod projects;
+pub mod tasks;
 pub mod readme;
 pub mod similar;
 pub mod releases;

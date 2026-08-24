@@ -266,3 +266,44 @@ export interface ProjectContribution {
   snapshot: ProjectSnapshot;
   issues: ProjectIssue[];
 }
+
+export type TaskStatus = 'candidate' | 'selected' | 'preparing' | 'in_progress' | 'ready_for_pr' | 'submitted' | 'blocked' | 'abandoned';
+
+export interface ContributionTask {
+  id: string;
+  project_id: string;
+  project_name: string;
+  github_full_name: string | null;
+  issue_id: number | null;
+  issue_number: number | null;
+  issue_url: string | null;
+  workspace_id: string | null;
+  title: string;
+  status: TaskStatus;
+  branch_name: string | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecentCommit {
+  sha: string;
+  summary: string;
+  author: string;
+  authored_at: string;
+}
+
+export interface TaskGitContext {
+  status: GitStatusSummary;
+  diff_stat: string;
+  staged_diff_stat: string;
+  recent_commits: RecentCommit[];
+}
+
+export interface TaskWorkspace {
+  task: ContributionTask;
+  workspace: Workspace | null;
+  git: TaskGitContext | null;
+  issue_body: string | null;
+  verification_commands: string[];
+}

@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result};
 
-const CURRENT_SCHEMA_VERSION: u32 = 15;
+const CURRENT_SCHEMA_VERSION: u32 = 16;
 
 pub fn run(conn: &Connection) -> Result<()> {
     // WAL mode MUST be set before any schema changes — enables concurrent reads+writes
@@ -397,6 +397,30 @@ pub fn run(conn: &Connection) -> Result<()> {
             CREATE INDEX IF NOT EXISTS idx_project_issues_project
                 ON project_issues(project_id, is_pull_request, updated_at DESC);
         ",
+        )?;
+    }
+
+    if version < 16 {
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS contribution_tasks (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                issue_id INTEGER REFERENCES project_issues(github_issue_id) ON DELETE SET NULL,
+                workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'selected'
+                    CHECK(status IN ('candidate','selected','preparing','in_progress','ready_for_pr','submitted','blocked','abandoned')),
+                branch_name TEXT,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_contribution_tasks_project
+                ON contribution_tasks(project_id, updated_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_contribution_tasks_status
+                ON contribution_tasks(status, updated_at DESC);
+            ",
         )?;
     }
 
@@ -807,5 +831,23 @@ mod tests {
         ).unwrap();
         assert_eq!(branch, "trunk");
         assert_eq!(readme, "# Read me");
+    }
+
+    #[test]
+    fn migration_v16_creates_persistent_contribution_tasks() {
+        let conn = open_test_db();
+        conn.execute("INSERT INTO projects (id, display_name) VALUES ('local:demo', 'demo')", []).unwrap();
+        conn.execute("INSERT INTO workspaces (id, project_id, local_path) VALUES ('workspace:/tmp/demo', 'local:demo', '/tmp/demo')", []).unwrap();
+        conn.execute(
+            "INSERT INTO contribution_tasks (id, project_id, workspace_id, title, notes) VALUES ('task:1', 'local:demo', 'workspace:/tmp/demo', 'Write tests', 'Start here')",
+            [],
+        ).unwrap();
+
+        let task: (String, String, String) = conn.query_row(
+            "SELECT title, status, notes FROM contribution_tasks WHERE id='task:1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        ).unwrap();
+        assert_eq!(task, ("Write tests".into(), "selected".into(), "Start here".into()));
     }
 }

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
-import type { ContributionBrief, Project, ProjectContribution, ProjectDraft } from './types';
+import type { ContributionBrief, ContributionTask, Project, ProjectContribution, ProjectDraft } from './types';
+import { TasksScreen } from './components/pivot/TaskWorkspace';
 
 type Screen = 'projects' | 'tasks' | 'maintain' | 'settings';
 type Role = Project['role_mode'];
@@ -115,12 +116,13 @@ function ContributionDocument({ brief }: { brief: ContributionBrief }) {
   </article>;
 }
 
-function ContributionWorkspace({ project }: { project: Project }) {
+function ContributionWorkspace({ project, onTaskCreated }: { project: Project; onTaskCreated: (task: ContributionTask) => void }) {
   const [data, setData] = useState<ProjectContribution | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issueFilter, setIssueFilter] = useState<'entry' | 'issues' | 'prs'>('entry');
+  const [creatingIssueId, setCreatingIssueId] = useState<number | null>(null);
 
   useEffect(() => {
     setLoading(true); setError(null); setData(null);
@@ -135,6 +137,13 @@ function ContributionWorkspace({ project }: { project: Project }) {
     try { setData(await invoke<ProjectContribution>('analyze_project_contribution', { projectId: project.id })); }
     catch (reason) { setError(String(reason)); }
     finally { setAnalyzing(false); }
+  }
+
+  async function createTask(issue: ProjectContribution['issues'][number]) {
+    setCreatingIssueId(issue.github_issue_id); setError(null);
+    try { onTaskCreated(await invoke<ContributionTask>('create_contribution_task', { projectId: project.id, issueId: issue.github_issue_id, title: issue.title, notes: null })); }
+    catch (reason) { setError(String(reason)); }
+    finally { setCreatingIssueId(null); }
   }
 
   if (loading) return <section className="pivot-contribution-loading"><span /><p>Reading the latest saved evidence…</p></section>;
@@ -167,12 +176,12 @@ function ContributionWorkspace({ project }: { project: Project }) {
     {brief ? <ContributionDocument brief={brief} /> : <div className="pivot-inline-error">The snapshot was saved without a valid Contribution Brief.</div>}
     <section className="pivot-issues">
       <header><div><span className="pivot-index">03 / PUBLIC ACTIVITY</span><h3>Choose a tractable entry point.</h3></div><div className="pivot-issue-filters">{([['entry', 'Entry issues'], ['issues', 'All issues'], ['prs', 'Pull requests']] as const).map(([value, label]) => <button key={value} className={issueFilter === value ? 'active' : ''} onClick={() => setIssueFilter(value)}>{label}</button>)}</div></header>
-      {issues.length === 0 ? <div className="pivot-issues-empty">No matching item was found in the latest cached GitHub sample.</div> : <div className="pivot-issue-list">{issues.map((issue) => <button key={issue.github_issue_id} onClick={() => void openUrl(issue.html_url)}><span className="pivot-issue-number">{issue.is_pull_request ? 'PR' : 'ISSUE'} #{issue.number}</span><div><strong>{issue.title}</strong><span>{issue.labels.map((label) => <i key={label}>{label}</i>)}</span></div><small>{issue.comments_count} comments<br />{issue.author_login ? `@${issue.author_login}` : ''}</small><b>↗</b></button>)}</div>}
+      {issues.length === 0 ? <div className="pivot-issues-empty">No matching item was found in the latest cached GitHub sample.</div> : <div className="pivot-issue-list">{issues.map((issue) => <div className="pivot-issue-row" key={issue.github_issue_id}><span className="pivot-issue-number">{issue.is_pull_request ? 'PR' : 'ISSUE'} #{issue.number}</span><div><strong>{issue.title}</strong><span>{issue.labels.map((label) => <i key={label}>{label}</i>)}</span></div><small>{issue.comments_count} comments<br />{issue.author_login ? `@${issue.author_login}` : ''}</small><div className="pivot-issue-actions">{!issue.is_pull_request && <button onClick={() => void createTask(issue)} disabled={creatingIssueId === issue.github_issue_id}>{creatingIssueId === issue.github_issue_id ? 'Adding…' : 'Start task'}</button>}<button onClick={() => void openUrl(issue.html_url)} aria-label="Open on GitHub">↗</button></div></div>)}</div>}
     </section>
   </section>;
 }
 
-function ProjectOverview({ project, onProjectChange }: { project: Project; onProjectChange: (project: Project) => void }) {
+function ProjectOverview({ project, onProjectChange, onTaskCreated }: { project: Project; onProjectChange: (project: Project) => void; onTaskCreated: (task: ContributionTask) => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const workspace = project.workspace;
@@ -206,7 +215,7 @@ function ProjectOverview({ project, onProjectChange }: { project: Project; onPro
         {!status?.clean && <div className="pivot-change-list">{status?.changed_files.slice(0, 6).map((file) => <code key={file}>{file}</code>)}{(status?.changed_files.length ?? 0) > 6 && <span>+{(status?.changed_files.length ?? 0) - 6} more</span>}</div>}
       </div> : <div className="pivot-connect-callout"><div><strong>No filesystem access granted.</strong><p>Connect an existing clone by adding its local path. Clone execution will arrive with a separate confirmation step.</p></div><span>READ-ONLY</span></div>}
     </section>
-    <ContributionWorkspace project={project} />
+    <ContributionWorkspace project={project} onTaskCreated={onTaskCreated} />
   </main>;
 }
 
@@ -225,6 +234,7 @@ export default function PivotApp() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [openedTaskId, setOpenedTaskId] = useState<string | null>(null);
   const selected = useMemo(() => projects.find((project) => project.id === selectedId) ?? null, [projects, selectedId]);
 
   useEffect(() => {
@@ -235,10 +245,15 @@ export default function PivotApp() {
     setProjects((items) => items.map((project) => project.id === next.id ? next : project));
   }
 
+  function openTask(task: ContributionTask) {
+    setOpenedTaskId(task.id);
+    setScreen('tasks');
+  }
+
   return <div className="pivot-shell">
     <aside className="pivot-nav"><button className="pivot-brand" onClick={() => setScreen('projects')} aria-label="eunha projects"><span>e</span><strong>eunha</strong></button><nav>{NAV.map((item) => <button key={item.id} className={screen === item.id ? 'active' : ''} onClick={() => setScreen(item.id)}><i>{item.mark}</i><span>{item.label}</span></button>)}</nav><footer><span>LOCAL</span><i>v0.1 pivot</i></footer></aside>
     <div className="pivot-workbench">
-      {screen === 'projects' ? <>{loading ? <div className="pivot-loading">Reading local workspace…</div> : <ProjectList projects={projects} selectedId={selectedId} onSelect={setSelectedId} onAdd={() => setAddOpen(true)} />}{selected ? <ProjectOverview project={selected} onProjectChange={updateProject} /> : !loading && <main className="pivot-no-selection"><span>PROJECT / 00</span><h1>Begin with a repository.</h1><p>The Star catalogue is no longer the starting point. Add only the work you intend to understand, contribute to, or maintain.</p><button onClick={() => setAddOpen(true)}>Add project</button></main>}</> : screen === 'tasks' || screen === 'maintain' ? <FutureScreen screen={screen} /> : <SettingsScreen />}
+      {screen === 'projects' ? <>{loading ? <div className="pivot-loading">Reading local workspace…</div> : <ProjectList projects={projects} selectedId={selectedId} onSelect={setSelectedId} onAdd={() => setAddOpen(true)} />}{selected ? <ProjectOverview project={selected} onProjectChange={updateProject} onTaskCreated={openTask} /> : !loading && <main className="pivot-no-selection"><span>PROJECT / 00</span><h1>Begin with a repository.</h1><p>The Star catalogue is no longer the starting point. Add only the work you intend to understand, contribute to, or maintain.</p><button onClick={() => setAddOpen(true)}>Add project</button></main>}</> : screen === 'tasks' ? <TasksScreen projects={projects} initialTaskId={openedTaskId} onProjectChange={updateProject} /> : screen === 'maintain' ? <FutureScreen screen="maintain" /> : <SettingsScreen />}
     </div>
     {addOpen && <AddProjectPanel onClose={() => setAddOpen(false)} onSaved={(project) => { setProjects((items) => [project, ...items]); setSelectedId(project.id); setAddOpen(false); setScreen('projects'); }} />}
   </div>;
