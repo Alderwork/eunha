@@ -82,13 +82,13 @@ export function TrendingView({ onBack, showToast, onRepoAdded, viewVariant, onVa
   const rowVirtualizer = useVirtualizer({
     count: viewVariant === 'masonry' ? 0 : repos.length,
     getScrollElement: () => listRef.current,
-    estimateSize: (i) =>
+    estimateSize: (i: number) =>
       getLibraryRowHeight(
         trendingRepoToRepo(reposRef.current[i]),
         i === selectedIdxRef.current,
         variantRef.current,
       ),
-    getItemKey: (i) => reposRef.current[i]?.full_name ?? i,
+    getItemKey: (i: number) => reposRef.current[i]?.full_name ?? i,
     overscan: 10,
   });
 
@@ -350,7 +350,7 @@ export function TrendingView({ onBack, showToast, onRepoAdded, viewVariant, onVa
         return (
           <div ref={listRef} role="list" className="flex-1 overflow-y-auto">
             <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-              {rowVirtualizer.getVirtualItems().map((vItem) => {
+              {rowVirtualizer.getVirtualItems().map((vItem: { index: number; start: number }) => {
                 const tRepo = repos[vItem.index];
                 const isSelected = vItem.index === selectedIdx;
                 const isAdding = adding.has(tRepo.full_name);

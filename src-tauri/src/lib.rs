@@ -33,8 +33,9 @@ pub fn run() {
             app.manage(FeedCancelState(Arc::new(AtomicBool::new(false))));
             app.manage(TrayState(Mutex::new(None)));
 
-            // Periodic star-list sync — runs in the background for the app's lifetime.
-            commands::sync::start_star_sync_scheduler(app.handle().clone());
+            // The legacy Star scheduler is intentionally not started by the
+            // Project workspace. Legacy data and commands remain available for
+            // migration work, but the pivot must not perform background sync.
 
             // Set app icon at runtime so it shows in Cmd+Tab / Mission Control
             // even when running via `tauri dev` (no .app bundle present).
@@ -49,6 +50,12 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::projects::inspect_project_input,
+            commands::projects::save_project,
+            commands::projects::list_projects,
+            commands::projects::get_project,
+            commands::projects::set_project_role,
+            commands::projects::refresh_project_workspace,
             commands::library::list_repos,
             commands::library::get_categories,
             commands::library::update_repo_user_fields,

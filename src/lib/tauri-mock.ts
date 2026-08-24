@@ -14,6 +14,8 @@
 import type {
 	Collection,
 	FeedGroup,
+	Project,
+	ProjectDraft,
 	Repo,
 	SimilarRepo,
 	WatchedRepoEntry,
@@ -49,6 +51,29 @@ interface MockData {
 }
 
 const CURRENT_PROMPT_VERSION = 1;
+
+const previewProjects: Project[] = [
+	{
+		id: 'github:openai/codex',
+		github_full_name: 'openai/codex',
+		remote_url: 'https://github.com/openai/codex',
+		display_name: 'codex',
+		description: 'Lightweight coding agent that runs in your terminal.',
+		role_mode: 'contributor',
+		created_at: '2026-08-24 09:00:00',
+		updated_at: '2026-08-24 09:00:00',
+		workspace: {
+			id: 'workspace:/Users/jgo/Developer/codex',
+			project_id: 'github:openai/codex',
+			local_path: '/Users/jgo/Developer/codex',
+			default_branch: 'main',
+			current_branch: 'docs/contribution-brief',
+			head_sha: '5d91a7430a18dc21',
+			git_status: { branch: 'docs/contribution-brief', head_sha: '5d91a7430a18dc21', changed_files: ['docs/contributing.md', 'README.md'], staged: 1, unstaged: 1, untracked: 0, clean: false },
+			last_scanned_at: new Date().toISOString(),
+		},
+	},
+];
 
 const fixture: MockData = {
 	exported_at: new Date().toISOString(),
@@ -179,6 +204,30 @@ export async function invoke<T>(cmd: string, args?: Record<string, any>): Promis
 	const a = args ?? {};
 
 	switch (cmd) {
+		// ── Local workspace pivot ─────────────────────────────
+		case 'list_projects':
+			return previewProjects as T;
+		case 'get_project':
+			return previewProjects.find((project) => project.id === a.projectId) as T;
+		case 'refresh_project_workspace':
+			return previewProjects.find((project) => project.id === a.projectId) as T;
+		case 'set_project_role': {
+			const project = previewProjects.find((item) => item.id === a.projectId);
+			if (project) project.role_mode = a.roleMode;
+			return project as T;
+		}
+		case 'inspect_project_input': {
+			const fullName = String(a.input).replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\.git\/?$/, '').replace(/\/$/, '');
+			if (!/^[-\w.]+\/[-\w.]+$/.test(fullName)) previewOnly('Local Git inspection');
+			const name = fullName.split('/')[1];
+			return { github_full_name: fullName, remote_url: `https://github.com/${fullName}`, display_name: name, description: 'Public GitHub repository ready to become an eunha project.', local_path: null, clone_suggestion: `/Users/jgo/Developer/${name}`, workspace_status: null, default_branch: 'main', warnings: ['No local workspace is connected yet. Clone remains a user-approved action.'] } as ProjectDraft as T;
+		}
+		case 'save_project': {
+			const draft = a.draft as ProjectDraft;
+			const project: Project = { id: draft.github_full_name ? `github:${draft.github_full_name}` : `local:${draft.local_path}`, github_full_name: draft.github_full_name, remote_url: draft.remote_url, display_name: draft.display_name, description: draft.description, role_mode: a.roleMode, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), workspace: null };
+			previewProjects.unshift(project);
+			return project as T;
+		}
 		// ── Library ──────────────────────────────────────────
 		case 'list_repos': {
 			const out = data.repos.filter(
