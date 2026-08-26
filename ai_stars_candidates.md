@@ -1,5 +1,8 @@
 # AI/LLM/Agent 관련 Starred Repos
 
+> [!WARNING]
+> **Legacy evaluation artifact.** 피봇 이전 Star library의 LLM 실험 자료이며 현재 제품 요구사항이나 추천 목록이 아니다. 현재 계약은 [docs/product/workroom-v1.md](docs/product/workroom-v1.md)를 따른다.
+
 Total starred: 290, AI-related: 54
 
 

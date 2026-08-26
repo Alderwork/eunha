@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18">
-  <!-- Crescent orb: outer circle minus inner circle shifted right+up, matching original orb highlight -->
-  <path fill="black" fill-rule="evenodd"
-    d="M9 1a8 8 0 1 0 0 16A8 8 0 0 0 9 1z
-       M11 2a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 11 2z"/>
-</svg>

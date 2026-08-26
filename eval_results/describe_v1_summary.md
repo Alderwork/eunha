@@ -1,5 +1,8 @@
 # LLM Describe v1 Results Summary
 
+> [!WARNING]
+> **Legacy evaluation artifact.** 이 결과는 피봇 이전 repository-description prompt를 평가한 기록이며 현재 Contribution Brief 계약이 아니다. 현재 계약은 [docs/product/workroom-v1.md](../docs/product/workroom-v1.md)를 따른다.
+
 Model: deepseek-v4-flash  
 Base URL: https://opencode.ai/zen/go/v1  
 Output Language: Korean  
