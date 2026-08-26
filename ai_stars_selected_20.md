@@ -1,5 +1,8 @@
 # AI/LLM/Agent 평가용 선정 20개 프로젝트
 
+> [!WARNING]
+> **Legacy evaluation artifact.** 피봇 이전 Star library의 LLM 실험 자료이며 현재 제품 요구사항이나 추천 목록이 아니다. 현재 계약은 [docs/product/workroom-v1.md](docs/product/workroom-v1.md)를 따른다.
+
 **선정 기준:**
 - AI/LLM/Agent 핵심 프로젝트
 - 카테고리/언어 다양성 확보

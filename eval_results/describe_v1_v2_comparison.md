@@ -1,5 +1,8 @@
 # v1 vs v2 Category/Tags Comparison
 
+> [!WARNING]
+> **Legacy evaluation artifact.** 이 비교는 피봇 이전 repository-description prompt를 평가한 기록이며 현재 Contribution Brief 계약이 아니다. 현재 계약은 [docs/product/workroom-v1.md](../docs/product/workroom-v1.md)를 따른다.
+
 | repo | v1 category | v2 category | v1 tags | v2 tags |
 |------|-------------|-------------|---------|---------|
 | Arsture/whispree | Other | Other | macOS, speech-to-text, LLM, local | speech-to-text, macos, open-source, llm |

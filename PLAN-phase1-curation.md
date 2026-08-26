@@ -1,5 +1,8 @@
 # eunha Phase 1 실행 플랜
 
+> [!WARNING]
+> **Legacy product plan.** 이 문서의 Phase 번호와 Star·digest·curation 목표는 피봇 이전 제품에만 적용된다. 현재 local-first contribution workroom의 제품 계약은 [docs/product/workroom-v1.md](docs/product/workroom-v1.md)를 따른다. 과거 실험 맥락을 보존하기 위해 내용은 수정하지 않는다.
+
 **기간:** 4주  
 **목표:** LLM 묘사 품질을 개선하고, 다이제스트 루프를 완성해서 본인이 4주 연속 자발적으로 eunha를 열어보게 만든다.  
 **큐레이션 시작 조건:** 4주 연속 다이제스트를 실제로 열어본 후  
