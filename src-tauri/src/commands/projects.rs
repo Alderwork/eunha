@@ -88,7 +88,7 @@ fn normalize_input(input: &str) -> Result<ProjectInput, String> {
         .ok_or_else(|| "Enter owner/repo, a GitHub URL, or an existing local path.".to_string())
 }
 
-fn git_output(root: &Path, args: &[&str]) -> Result<String, String> {
+pub(crate) fn git_output(root: &Path, args: &[&str]) -> Result<String, String> {
     let output = Command::new("git")
         .arg("-C")
         .arg(root)
@@ -106,7 +106,7 @@ fn git_output(root: &Path, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-fn inspect_workspace(path: &Path) -> Result<(PathBuf, Option<String>, GitStatusSummary), String> {
+pub(crate) fn inspect_workspace(path: &Path) -> Result<(PathBuf, Option<String>, GitStatusSummary), String> {
     let root_raw = git_output(path, &["rev-parse", "--show-toplevel"])
         .map_err(|_| "The selected path is not inside a Git repository.".to_string())?;
     let root = PathBuf::from(root_raw)
@@ -286,7 +286,7 @@ fn project_id(draft: &ProjectDraft) -> String {
         })
 }
 
-fn workspace_id(path: &str) -> String {
+pub(crate) fn workspace_id(path: &str) -> String {
     format!("workspace:{path}")
 }
 
@@ -430,6 +430,60 @@ pub fn refresh_project_workspace(
     }
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     conn.execute("UPDATE workspaces SET default_branch=?1,current_branch=?2,head_sha=?3,git_status_json=?4,last_scanned_at=datetime('now') WHERE project_id=?5", params![default_branch, status.branch, status.head_sha, serde_json::to_string(&status).map_err(|e| e.to_string())?, project_id]).map_err(|e| e.to_string())?;
+    drop(conn);
+    get_project_inner(&state, &project_id)
+}
+
+#[tauri::command]
+pub fn connect_project_workspace(
+    project_id: String,
+    local_path: String,
+    state: State<'_, DbState>,
+) -> Result<Project, String> {
+    let path = expand_local_path(local_path.trim())
+        .canonicalize()
+        .map_err(|_| "Local path does not exist or cannot be accessed.".to_string())?;
+    let (root, default_branch, status) = inspect_workspace(&path)?;
+    let root_string = root.to_string_lossy().to_string();
+    let remote = remote_origin(&root);
+    let remote_name = remote.as_deref().and_then(parse_github_full_name);
+
+    let expected_name: Option<String> = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        conn.query_row(
+            "SELECT github_full_name FROM projects WHERE id=?1",
+            [&project_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Project not found.".to_string())?
+    };
+    if let Some(expected) = expected_name {
+        if remote_name.as_deref() != Some(expected.as_str()) {
+            return Err(format!(
+                "The selected repository origin does not match {expected}."
+            ));
+        }
+    }
+
+    let id = workspace_id(&root_string);
+    let status_json = serde_json::to_string(&status).map_err(|e| e.to_string())?;
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO workspaces (id, project_id, local_path, default_branch, current_branch, head_sha, git_status_json, last_scanned_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,datetime('now'))",
+        params![id, project_id, root_string, default_branch, status.branch, status.head_sha, status_json],
+    )
+    .map_err(|e| if e.to_string().contains("UNIQUE") { "This local workspace is already connected.".into() } else { e.to_string() })?;
+    conn.execute(
+        "UPDATE contribution_tasks SET workspace_id=?1,updated_at=datetime('now') WHERE project_id=?2 AND workspace_id IS NULL",
+        params![id, project_id],
+    ).map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE projects SET default_branch=COALESCE(default_branch,?1),updated_at=datetime('now') WHERE id=?2",
+        params![default_branch, project_id],
+    ).map_err(|e| e.to_string())?;
     drop(conn);
     get_project_inner(&state, &project_id)
 }

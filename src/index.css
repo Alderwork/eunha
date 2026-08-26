@@ -299,14 +299,17 @@ body {
 .pivot-issue-filters { display: flex; gap: 2px; }
 .pivot-issue-filters button { padding: 7px 9px; border: 1px solid transparent; background: transparent; color: var(--pivot-dim); font-size: 8px; }
 .pivot-issue-filters button.active { border-color: var(--pivot-rule); background: var(--pivot-panel); color: var(--pivot-ink); }
-.pivot-issue-list > button { display: grid; grid-template-columns: 105px minmax(0, 1fr) 95px 18px; gap: 15px; align-items: center; width: 100%; min-height: 73px; padding: 13px 9px; border: 0; border-bottom: 1px solid var(--pivot-rule); background: transparent; color: var(--pivot-ink); text-align: left; transition: 100ms ease-out; }
-.pivot-issue-list > button:hover { padding-left: 14px; background: var(--pivot-panel); }
+.pivot-issue-row { display: grid; grid-template-columns: 105px minmax(0, 1fr) 95px auto; gap: 15px; align-items: center; width: 100%; min-height: 73px; padding: 13px 9px; border-bottom: 1px solid var(--pivot-rule); color: var(--pivot-ink); transition: 100ms ease-out; }
+.pivot-issue-row:hover { padding-left: 14px; background: var(--pivot-panel); }
 .pivot-issue-number { color: var(--pivot-dim); font-size: 8px; }
 .pivot-issue-list strong { display: block; margin-bottom: 8px; font: 500 12px/1.35 -apple-system, BlinkMacSystemFont, sans-serif; }
 .pivot-issue-list div > span { display: flex; flex-wrap: wrap; gap: 5px; }
 .pivot-issue-list i { padding: 3px 5px; border: 1px solid var(--pivot-rule); color: var(--pivot-muted); font-size: 7px; font-style: normal; }
 .pivot-issue-list small { color: var(--pivot-dim); font-size: 8px; line-height: 1.7; text-align: right; }
-.pivot-issue-list > button > b { color: var(--pivot-signal); font-size: 11px; font-weight: 400; }
+.pivot-issue-actions { display: flex; gap: 5px; }
+.pivot-issue-actions button { padding: 7px 8px; border: 1px solid var(--pivot-rule); background: transparent; color: var(--pivot-muted); font-size: 8px; white-space: nowrap; }
+.pivot-issue-actions button:first-child { border-color: rgba(216, 255, 87, .28); color: var(--pivot-signal); }
+.pivot-issue-actions button:hover { background: var(--pivot-raised); color: var(--pivot-ink); }
 .pivot-issues-empty { padding: 38px 0; color: var(--pivot-muted); font: 12px -apple-system, BlinkMacSystemFont, sans-serif; }
 .pivot-scrim { position: fixed; z-index: 100; inset: 0; display: flex; justify-content: flex-end; background: rgba(0, 0, 0, .68); backdrop-filter: blur(3px); }
 .pivot-add-panel { width: min(690px, calc(100vw - 45px)); height: 100%; overflow-y: auto; padding: 42px 45px 60px; border-left: 1px solid var(--pivot-rule); background: var(--pivot-paper); box-shadow: -24px 0 70px rgba(0, 0, 0, .45); color: var(--pivot-ink); }
@@ -346,6 +349,105 @@ body {
 .pivot-draft footer button { min-height: 38px; padding: 0 14px; font-size: 9px; text-transform: uppercase; }
 .pivot-secondary { border: 1px solid var(--pivot-rule); background: transparent; color: var(--pivot-muted); }
 .pivot-primary { border: 1px solid var(--pivot-signal); background: var(--pivot-signal); color: #11150b; font-weight: 700; }
+.pivot-task-list { width: 345px; flex: 0 0 345px; height: 100%; overflow-y: auto; border-right: 1px solid var(--pivot-rule); background: rgba(10, 12, 11, .97); }
+.pivot-task-list > header { display: flex; align-items: flex-end; justify-content: space-between; min-height: 120px; padding: 27px 23px 21px; border-bottom: 1px solid var(--pivot-rule); }
+.pivot-task-list h1 { margin: 8px 0 0; font: 400 31px Georgia, serif; letter-spacing: -.04em; }
+.pivot-task-list > header > span { color: var(--pivot-signal); font-size: 8px; }
+.pivot-direct-task { padding: 18px 15px; border-bottom: 1px solid var(--pivot-rule); background: var(--pivot-panel); }
+.pivot-direct-task > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 1px; margin-top: 10px; background: var(--pivot-rule); border: 1px solid var(--pivot-rule); }
+.pivot-direct-task select, .pivot-direct-task input { height: 35px; min-width: 0; border: 0; outline: 0; background: var(--pivot-paper); color: var(--pivot-muted); font-size: 8px; }
+.pivot-direct-task select { padding: 0 7px; }
+.pivot-direct-task input { padding: 0 9px; }
+.pivot-direct-task button { grid-column: 1 / -1; height: 31px; border: 0; border-top: 1px solid var(--pivot-rule); background: var(--pivot-raised); color: var(--pivot-signal); font-size: 8px; text-transform: uppercase; }
+.pivot-direct-task button:disabled { color: var(--pivot-dim); cursor: default; }
+.pivot-direct-task .pivot-error { margin-bottom: 0; }
+.pivot-task-rows > button { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 10px; width: 100%; min-height: 91px; padding: 15px; border: 0; border-bottom: 1px solid var(--pivot-rule); background: transparent; color: var(--pivot-ink); text-align: left; }
+.pivot-task-rows > button:hover, .pivot-task-rows > button.active { background: var(--pivot-panel); }
+.pivot-task-rows > button.active { box-shadow: inset 3px 0 var(--pivot-signal); }
+.pivot-task-rows > button > span { color: var(--pivot-dim); font-size: 8px; }
+.pivot-task-rows > button > div { min-width: 0; }
+.pivot-task-rows strong, .pivot-task-rows small, .pivot-task-rows i { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pivot-task-rows strong { margin-bottom: 7px; font: 500 11px/1.35 -apple-system, BlinkMacSystemFont, sans-serif; }
+.pivot-task-rows small { color: var(--pivot-muted); font-size: 8px; }
+.pivot-task-rows i { margin-top: 8px; color: var(--pivot-dim); font-size: 8px; font-style: normal; }
+.pivot-task-rows b { grid-column: 2; justify-self: start; padding: 3px 5px; border: 1px solid var(--pivot-rule); color: var(--pivot-muted); font-size: 7px; font-weight: 500; text-transform: uppercase; }
+.pivot-task-rows b.in_progress, .pivot-task-rows b.ready_for_pr { border-color: rgba(216, 255, 87, .25); color: var(--pivot-signal); }
+.pivot-task-rows b.blocked, .pivot-task-rows b.abandoned { color: var(--pivot-warn); }
+.pivot-empty-tasks { display: grid; justify-items: start; gap: 11px; padding: 45px 24px; color: var(--pivot-muted); }
+.pivot-empty-tasks > span { font: 40px Georgia, serif; color: var(--pivot-rule); }
+.pivot-empty-tasks strong { color: var(--pivot-ink); font-size: 11px; }
+.pivot-empty-tasks p { font: 11px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+.pivot-task-detail { flex: 1; min-width: 0; height: 100%; overflow-y: auto; padding-bottom: 80px; }
+.pivot-task-loading { display: grid; place-items: center; color: var(--pivot-muted); font-size: 10px; }
+.pivot-task-empty { display: grid; flex: 1; align-content: center; padding: clamp(50px, 9vw, 140px); }
+.pivot-task-empty h1 { max-width: 760px; margin: 18px 0; font: 400 clamp(42px, 6vw, 78px)/.95 Georgia, serif; letter-spacing: -.06em; }
+.pivot-task-empty p { max-width: 620px; color: var(--pivot-muted); font: 14px/1.65 -apple-system, BlinkMacSystemFont, sans-serif; }
+.pivot-task-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 30px; min-height: 218px; padding: 46px clamp(30px, 5vw, 72px) 34px; border-bottom: 1px solid var(--pivot-rule); background: radial-gradient(circle at 85% 15%, rgba(216, 255, 87, .055), transparent 28%); }
+.pivot-task-hero h1 { max-width: 850px; margin: 15px 0 18px; font: 400 clamp(34px, 4vw, 57px)/1.02 Georgia, serif; letter-spacing: -.05em; }
+.pivot-task-hero p { color: var(--pivot-muted); font-size: 9px; }
+.pivot-task-status { padding: 8px 10px; border: 1px solid var(--pivot-rule); color: var(--pivot-muted); font-size: 8px; text-transform: uppercase; white-space: nowrap; }
+.pivot-task-status.in_progress, .pivot-task-status.ready_for_pr { border-color: rgba(216, 255, 87, .35); color: var(--pivot-signal); }
+.pivot-task-status.blocked, .pivot-task-status.abandoned { color: var(--pivot-warn); }
+.pivot-task-actions { display: flex; align-items: center; gap: 28px; padding: 12px clamp(30px, 5vw, 72px); border-bottom: 1px solid var(--pivot-rule); background: var(--pivot-panel); }
+.pivot-task-actions > div { display: flex; align-items: center; gap: 5px; }
+.pivot-task-actions span { margin-right: 5px; color: var(--pivot-dim); font-size: 7px; letter-spacing: .1em; }
+.pivot-task-actions button { padding: 6px 8px; border: 1px solid var(--pivot-rule); background: var(--pivot-paper); color: var(--pivot-muted); font-size: 8px; }
+.pivot-task-actions button:hover { color: var(--pivot-ink); }
+.pivot-task-actions .pivot-refresh-task { margin-left: auto; color: var(--pivot-signal); }
+.pivot-task-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); gap: 1px; padding: 1px clamp(30px, 5vw, 72px) 0; background: var(--pivot-rule); }
+.pivot-task-grid > section { min-width: 0; padding: 28px; background: var(--pivot-paper); }
+.pivot-task-grid section > header { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 24px; }
+.pivot-task-grid section > header button { border: 0; background: transparent; color: var(--pivot-signal); font-size: 8px; }
+.pivot-task-grid section > header > code { overflow: hidden; color: var(--pivot-signal); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.pivot-task-plan > p { max-height: 230px; overflow: auto; margin: 0 0 27px; white-space: pre-wrap; color: var(--pivot-muted); font: 12px/1.65 -apple-system, BlinkMacSystemFont, sans-serif; }
+.pivot-task-plan > p.muted { color: var(--pivot-dim); }
+.pivot-task-notes { padding-top: 21px; border-top: 1px solid var(--pivot-rule); }
+.pivot-task-notes label { display: grid; gap: 9px; color: var(--pivot-muted); font-size: 8px; text-transform: uppercase; }
+.pivot-task-notes textarea { min-height: 140px; resize: vertical; padding: 13px; border: 1px solid var(--pivot-rule); outline: 0; background: var(--pivot-panel); color: var(--pivot-ink); font: 11px/1.55 -apple-system, BlinkMacSystemFont, sans-serif; }
+.pivot-task-notes textarea:focus { border-color: rgba(216, 255, 87, .4); }
+.pivot-task-notes button { float: right; margin-top: 8px; padding: 7px 9px; border: 1px solid var(--pivot-rule); background: var(--pivot-raised); color: var(--pivot-signal); font-size: 8px; }
+.pivot-live-git { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 25px; padding-bottom: 22px; border-bottom: 1px solid var(--pivot-rule); }
+.pivot-live-git > div { display: grid; gap: 6px; min-width: 0; }
+.pivot-live-git small, .pivot-live-git dt { color: var(--pivot-dim); font-size: 7px; }
+.pivot-live-git strong, .pivot-live-git code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pivot-live-git strong { font-size: 12px; }
+.pivot-live-git code { color: var(--pivot-muted); font-size: 8px; }
+.pivot-live-git dl { display: grid; grid-template-columns: repeat(3, 45px); gap: 1px; margin: 0; background: var(--pivot-rule); }
+.pivot-live-git dl div { display: grid; gap: 7px; place-items: center; padding: 8px 4px; background: var(--pivot-panel); }
+.pivot-live-git dd { margin: 0; font-size: 11px; }
+.pivot-task-files { display: flex; flex-wrap: wrap; gap: 5px; padding: 17px 0; }
+.pivot-task-files code { padding: 5px 6px; background: var(--pivot-panel); color: var(--pivot-muted); font-size: 8px; }
+.pivot-clean-tree { padding: 23px 0; color: var(--pivot-signal); font-size: 8px; letter-spacing: .1em; }
+.pivot-diff-stat { max-height: 190px; overflow: auto; margin: 0; padding: 13px; border: 1px solid var(--pivot-rule); background: var(--pivot-panel); color: var(--pivot-muted); font: 8px/1.6 ui-monospace, monospace; white-space: pre-wrap; }
+.pivot-workspace-connect strong { font: 400 24px Georgia, serif; }
+.pivot-workspace-connect p { color: var(--pivot-muted); font: 11px/1.6 -apple-system, BlinkMacSystemFont, sans-serif; }
+.pivot-workspace-connect > div { display: flex; margin-top: 20px; border: 1px solid var(--pivot-rule); }
+.pivot-workspace-connect input { min-width: 0; flex: 1; height: 39px; padding: 0 10px; border: 0; outline: 0; background: var(--pivot-panel); color: var(--pivot-ink); font-size: 9px; }
+.pivot-workspace-connect button { border: 0; border-left: 1px solid var(--pivot-rule); background: var(--pivot-signal); color: #11150b; font-size: 8px; font-weight: 700; }
+.pivot-workspace-connect small { display: block; margin-top: 11px; color: var(--pivot-dim); font-size: 8px; line-height: 1.5; }
+.pivot-task-checks { display: grid; align-content: start; gap: 7px; }
+.pivot-task-checks header { margin-bottom: 12px !important; }
+.pivot-task-checks header i { color: var(--pivot-warn); font-size: 7px; font-style: normal; }
+.pivot-task-checks > code { padding: 8px 9px; border: 1px solid var(--pivot-rule); background: var(--pivot-panel); color: var(--pivot-muted); font-size: 9px; }
+.pivot-task-checks > code span { margin-right: 7px; color: var(--pivot-signal); }
+.pivot-task-checks > p, .pivot-task-commits > p { color: var(--pivot-dim); font: 11px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; }
+.pivot-task-checks > small { margin-top: 8px; color: var(--pivot-dim); font-size: 7px; line-height: 1.5; }
+.pivot-task-commits > div { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 6px 10px; padding: 10px 0; border-top: 1px solid var(--pivot-rule); }
+.pivot-task-commits > div code { color: var(--pivot-signal); font-size: 8px; }
+.pivot-task-commits > div strong { overflow: hidden; font: 500 10px -apple-system, BlinkMacSystemFont, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.pivot-task-commits > div small { grid-column: 2; color: var(--pivot-dim); font-size: 7px; }
+.pivot-branch-confirm { width: min(620px, calc(100vw - 45px)); height: 100%; overflow-y: auto; padding: 42px 45px; border-left: 1px solid var(--pivot-rule); background: var(--pivot-paper); box-shadow: -24px 0 70px rgba(0, 0, 0, .45); }
+.pivot-branch-confirm > header { display: flex; justify-content: space-between; }
+.pivot-branch-confirm h2 { margin: 12px 0 0; font: 400 37px Georgia, serif; letter-spacing: -.045em; }
+.pivot-branch-confirm > p { margin: 42px 0 25px; color: var(--pivot-muted); font: 12px/1.6 -apple-system, BlinkMacSystemFont, sans-serif; }
+.pivot-branch-confirm dl { margin: 0 0 28px; border-top: 1px solid var(--pivot-rule); }
+.pivot-branch-confirm dl div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--pivot-rule); }
+.pivot-branch-confirm dt { color: var(--pivot-dim); font-size: 8px; }
+.pivot-branch-confirm dd { overflow-wrap: anywhere; margin: 0; color: var(--pivot-muted); font-size: 9px; }
+.pivot-branch-confirm label { display: grid; gap: 8px; color: var(--pivot-muted); font-size: 8px; text-transform: uppercase; }
+.pivot-branch-confirm input { height: 42px; padding: 0 12px; border: 1px solid var(--pivot-rule); outline: 0; background: var(--pivot-panel); color: var(--pivot-ink); font-size: 10px; }
+.pivot-branch-confirm footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 28px; }
+.pivot-branch-confirm footer button { min-height: 38px; padding: 0 13px; font-size: 8px; text-transform: uppercase; }
 .pivot-legacy > button { position: fixed; z-index: 999; top: 8px; left: 50%; transform: translateX(-50%); padding: 7px 12px; border: 1px solid #d8ff57; background: #11150b; color: #d8ff57; font: 10px ui-monospace, monospace; cursor: pointer; }
 
 @media (max-width: 980px) {
@@ -355,6 +457,8 @@ body {
   .pivot-status-primary { border-right: 0; border-bottom: 1px solid var(--pivot-rule); }
   .pivot-overview-grid { grid-template-columns: 1fr; }
   .pivot-source-strip { grid-template-columns: repeat(3, 1fr); }
+  .pivot-task-list { width: 295px; flex-basis: 295px; }
+  .pivot-task-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
@@ -374,8 +478,13 @@ body {
   .pivot-brief-document > header, .pivot-brief-columns { grid-template-columns: 1fr; }
   .pivot-source-strip { grid-template-columns: repeat(2, 1fr); }
   .pivot-issues > header { align-items: flex-start; flex-direction: column; }
-  .pivot-issue-list > button { grid-template-columns: 82px minmax(0, 1fr) 15px; }
+  .pivot-issue-row { grid-template-columns: 82px minmax(0, 1fr) auto; }
   .pivot-issue-list small { display: none; }
+  .pivot-task-list { width: 100%; flex-basis: 100%; }
+  .pivot-task-detail { position: absolute; z-index: 5; inset: 0; background: var(--pivot-paper); }
+  .pivot-task-hero { min-height: 190px; padding-inline: 24px; }
+  .pivot-task-actions { overflow-x: auto; padding-inline: 24px; }
+  .pivot-task-grid { padding-inline: 24px; }
   .pivot-future, .pivot-settings { padding: 70px 28px; }
   .pivot-add-panel { padding: 35px 24px; }
 }

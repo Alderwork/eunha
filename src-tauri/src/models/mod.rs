@@ -121,6 +121,49 @@ pub struct ProjectContribution {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContributionTask {
+    pub id: String,
+    pub project_id: String,
+    pub project_name: String,
+    pub github_full_name: Option<String>,
+    pub issue_id: Option<i64>,
+    pub issue_number: Option<i64>,
+    pub issue_url: Option<String>,
+    pub workspace_id: Option<String>,
+    pub title: String,
+    pub status: String,
+    pub branch_name: Option<String>,
+    pub notes: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecentCommit {
+    pub sha: String,
+    pub summary: String,
+    pub author: String,
+    pub authored_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskGitContext {
+    pub status: GitStatusSummary,
+    pub diff_stat: String,
+    pub staged_diff_stat: String,
+    pub recent_commits: Vec<RecentCommit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskWorkspace {
+    pub task: ContributionTask,
+    pub workspace: Option<Workspace>,
+    pub git: Option<TaskGitContext>,
+    pub issue_body: Option<String>,
+    pub verification_commands: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Collection {
     pub id: i64,
     pub name: String,
