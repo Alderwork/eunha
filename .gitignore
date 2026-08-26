@@ -6,7 +6,9 @@ src-tauri/target/
 .gstack/
 .worktrees/
 .superpowers/
-TODOS.md
-/docs/
+/docs/*
+!/docs/product/
+/docs/product/*
+!/docs/product/workroom-v1.md
 .vscode/
 public/mock-data.json

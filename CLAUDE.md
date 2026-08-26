@@ -1,194 +1,130 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+이 문서는 eunha 저장소에서 작업할 때 지켜야 할 현재 구현 계약이다.
 
-## What this is
+## Product contract
 
-eunha is a local-first, keyboard-first desktop app for building a personal GitHub repo library. You import your starred repos (or any repo), then on-demand describe them with an LLM using a consistent prompt. The result is a searchable, categorized library you can navigate without a mouse.
+eunha는 공개 GitHub repository와 실제 local Git repository를 연결하는 local-first 오픈소스 기여 workroom이다. active product는 Star library가 아니라 `Project → Workspace → Contribution Task` 흐름이다. Contributor가 MVP의 주 사용자이며 Maintainer와 Owner는 같은 Project evidence를 다른 관점으로 읽는다.
 
-**This is a Tauri v2 app: Rust backend + React frontend.** No cloud component in v1.
+AI는 수집된 근거를 정리하고 다음 행동을 제안할 뿐이다. commit, push, PR, 임의 명령 실행을 대신하지 않는다. local repository나 외부 시스템 상태를 바꾸는 허용된 mutation에는 각각 별도 사용자 확인이 필요하다.
 
-## Stack
+## Current implementation
 
-- **Tauri v2** — Rust backend (`src-tauri/`), React frontend (`src/`)
-- **rusqlite** — SQLite on disk; FTS5 for search
-- **React + Tailwind** — frontend, with `@tanstack/virtual` for list virtualization
-- **Conduit** (`@conduit/core` + `@conduit/react`, `link:../conduit/packages/*`) — AI provider connections (BYOK). Symlinked live to the sibling repo (do NOT use `file:` — pnpm snapshots it at install time and code changes silently stop propagating). Vite consumes their `dist/`, so rebuild the packages after editing them; `resolve.dedupe: ['react','react-dom']` in vite.config.ts keeps one React copy.
-- **toml** — `~/.eunha/config.toml` (0600) for GitHub PAT; `~/.eunha/connections.toml` (0600) for LLM connections
-- **tauri-plugin-clipboard-manager** — clipboard read on Add dialog open
+- Active frontend entry: `src/main.tsx` → `src/EunhaApp.tsx`
+- Project UI: `src/EunhaApp.tsx`
+- Task UI: `src/components/workroom/TaskWorkspace.tsx`
+- Settings UI: `src/components/workroom/SettingsWorkspace.tsx`
+- Project/Git inspection: `src-tauri/src/commands/projects.rs`
+- Contribution Brief: `src-tauri/src/commands/project_brief.rs`
+- LLM execution: `src-tauri/src/llm.rs`
+- Task state and branch creation: `src-tauri/src/commands/tasks.rs`
+- Schema runner: `src-tauri/src/db/migrations.rs`
+- Current schema version: **16**
 
-## Common Commands
-
-```bash
-# Dev
-pnpm tauri dev
-
-# Build
-pnpm tauri build
-
-# Frontend only (faster iteration)
-pnpm dev
-
-# Type check
-pnpm tsc --noEmit
-
-# Lint
-pnpm lint
-```
+Phase 3까지 구현되어 있다. 검사 실행·기록과 PR readiness는 Phase 4, Maintainer/Owner 화면은 Phase 5다. `ready_for_pr`과 `submitted`는 Phase 4 전용 예약 상태이며 Phase 3의 일반 Task 상태 UI·command로 설정하지 않는다.
 
 ## Architecture
 
-All GitHub API calls and DB writes happen in **Rust command handlers** (`src-tauri/src/commands/`). The React frontend calls these via Tauri's `invoke()` — it never talks to GitHub or SQLite directly.
-
+```text
+React / TypeScript
+        │ Tauri invoke
+        ▼
+Rust
+ ├─ Project / Task domain commands
+ ├─ Git + filesystem inspection
+ ├─ GitHub public API client
+ ├─ LLM call + response validation
+ └─ rusqlite
+        ▼
+SQLite
 ```
-React (src/)
-  └── invoke("import_stars" | "add_repo" | "describe_repo" | "search")
-        ↓ Tauri IPC
-Rust (src-tauri/src/commands/)
-  ├── GitHub API (tokio, reqwest) — stars import, repo metadata, README fetch
-  ├── LLM API (reqwest) — OpenAI / Anthropic / Ollama / OpenCode Go
-  └── SQLite (rusqlite) — repos table + FTS5 virtual table
-```
 
-**AI provider connections (Conduit).** Connection management (BYOK: key entry, validation, model discovery, default model) runs on `@conduit/core` in the frontend (`src/lib/conduit.ts`), backed by two Rust bridges in `src-tauri/src/conduit.rs`. All built-in core presets are registered (33 providers) plus two local overrides: `ollama` (native API, auto-managed) and `opencode-go` (static model list + chat-probe validation).
+React는 filesystem, shell, SQLite에 직접 접근하지 않는다. credential 입력은 Rust로 전달하고 저장된 원문은 React로 반환하지 않는다. Rust command가 trust boundary다.
 
-- **Storage** — `conduit_list/save/delete/set_active` commands → `~/.eunha/connections.toml` (0600). Lists strip credentials (`key_set` only).
-- **HTTP proxy** — `conduit_http(connection_id, auth, request)`: Rust looks up the key and injects it per the adapter's auth scheme (bearer / x-api-key / api-key / query / none). **API keys never enter the webview.** The proxy only injects into allowlisted hosts (`ALLOWED_REMOTE_HOSTS` in conduit.rs — update it when adding a provider; Azure Foundry is matched by the `.openai.azure.com` suffix); localhost is always allowed for self-hosted providers.
-
-The LLM *execution* path stays in Rust: `get_llm_settings()` (describe.rs) derives `{provider, api_key, model, meta}` from the active connection; `call_llm` routes by provider — anthropic and ollama have native arms, azure-foundry/lmstudio build their URL from connection meta, and every other provider goes through the `chat_completions_url` table (OpenAI-compatible, bearer) with a `response_format` retry fallback. Providers without a stored `default_model` fail with a "pick a model" error until the user selects one. Legacy `llm_api_key`/`llm_provider` settings are migrated into the first connection on startup (idempotent, then removed from config.toml).
-
-**Ollama is auto-managed** (`src-tauri/src/ollama.rs`): before any Ollama request, `ensure_running()` probes `{base}/api/version`; if the base URL is localhost and nothing answers, the app spawns a detached `ollama serve` itself and waits up to 20s for health. Users never run `ollama serve` manually. If the binary isn't found (PATH, `/opt/homebrew/bin`, `/usr/local/bin`, Ollama.app bundle), the error tells the user to install Ollama. Remote (non-localhost) base URLs are never auto-started. Model pulls are still manual (`ollama pull <model>`) — a 404 from `/api/generate` surfaces that instruction. The conduit proxy calls `ensure_running` only when the connection's provider is `ollama`, so other localhost providers (LM Studio) never spawn a server.
-
-**OpenCode Go** is a provider option (`opencode-go`) using the OpenAI-compatible endpoint `https://opencode.ai/zen/go/v1/chat/completions`. Its model list is a curated static list in `src/lib/conduit.ts` (MiniMax/Qwen use a different endpoint shape and are not wired up). Key validation probes the chat endpoint with `max_tokens: 1` — `/models` is public and returns 200 for any key, so it cannot validate.
+AI connection UI는 `SettingsWorkspace.tsx`에서 Rust의 `conduit_list/save/delete/set_active` command를 직접 호출한다. 저장 구현은 `src-tauri/src/conduit.rs`, LLM 실행과 response validation은 Rust에 남으며 별도 sibling package가 필요하지 않다.
 
 ## Database
 
-**Schema version** is tracked via `PRAGMA user_version`. The migration runner in `src-tauri/src/db/migrations.rs` runs on every startup. Current version: 1.
+`PRAGMA user_version` 기반 migration을 매 startup에 실행한다.
 
-**Core table:**
-```sql
-repos (
-  id TEXT PRIMARY KEY,    -- "{owner}/{repo}"
-  full_name TEXT,
-  description TEXT,       -- raw GitHub description; shown as fallback when llm_summary is null
-  source TEXT,            -- "starred" | "manual"
+현재 domain tables:
 
-  -- LLM fields — written atomically or not at all
-  llm_summary TEXT,       -- raw JSON blob (backup/audit)
-  llm_what TEXT,          -- extracted "what" field; max 80 chars; primary list row display
-  llm_why TEXT,           -- extracted "why" field; max 80 chars
-  llm_use_case TEXT,      -- extracted "use_case" field; max 80 chars
-  llm_category TEXT,      -- extracted from blob; source of truth for filter queries
-  llm_tags TEXT,          -- JSON array extracted from blob; source of truth for filter queries
-  llm_generated_at DATETIME,
-  prompt_version INTEGER, -- incremented when the prompt changes; v1 = 1
+- `projects`: repository identity와 role perspective
+- `workspaces`: 사용자가 연결한 canonical local Git root와 마지막 status
+- `project_snapshots`: 문서, 도구, evidence, Contribution Brief
+- `project_issues`: 공개 GitHub issue/PR cache
+- `contribution_tasks`: issue 또는 직접 만든 작업, 상태, branch, notes
 
-  user_notes TEXT,
-  user_category TEXT      -- overrides llm_category in display when non-null
-)
+Task 상태 모델 (`ready_for_pr` 이후는 Phase 4 예약):
+
+```text
+candidate → selected → preparing → in_progress → ready_for_pr → submitted
+                         ↘ blocked
+                         ↘ abandoned
 ```
 
-**Schema invariant:** On every describe (both `d` and shift-D), write all 8 llm_* columns atomically: `llm_summary`, `llm_what`, `llm_why`, `llm_use_case`, `llm_category`, `llm_tags`, `llm_generated_at`, `prompt_version`. Never update one without the others. Use the `write_llm_description(repo_id, LlmResult)` function — don't write ad-hoc UPDATE statements.
+domain 전이 순서는 `tasks.rs::valid_transition`이 정본이다. 다만 Phase 3의 일반 상태 변경 command는 `ready_for_pr`과 `submitted`를 모두 거부한다. Phase 4의 근거 기반 readiness 흐름만 `ready_for_pr`을, 사용자 제출 확인 흐름만 `submitted`를 설정해야 한다.
 
-**FTS5:** `repos_fts` virtual table indexes `full_name`, `llm_what`, `llm_why`, `llm_use_case`, `llm_category`, `llm_tags`, `user_notes` — NOT `llm_summary` (the raw JSON blob would produce garbage search matches on JSON field names). Synced via AFTER INSERT/UPDATE/DELETE triggers. Search query: `SELECT repos.* FROM repos JOIN repos_fts ON repos.rowid = repos_fts.rowid WHERE repos_fts MATCH ?`. Falls back to LIKE if FTS5 query fails.
+`repos`와 Star 관련 tables는 향후 migration/export를 위한 legacy 데이터 보존용이다. active UI와 command에서는 읽지 않는다. 새 기능을 이 schema에 추가하지 말고 Project domain을 사용한다.
 
-**FTS5 trigger pattern (critical):** For FTS5 content tables, DELETE and UPDATE triggers must use the special `INSERT INTO fts(fts, rowid, ...) VALUES('delete', ...)` form — NOT `DELETE FROM fts WHERE rowid = ...`. Using plain DELETE leaves stale index entries and causes duplicate/incorrect search results.
+## Contribution Brief contract
 
-**WAL mode:** `PRAGMA journal_mode=WAL` is set as the first step in `migrations.rs` before any schema changes. Required for concurrent import + describe writes to avoid "database is locked" errors.
+Brief JSON shape:
 
-## LLM Prompt Contract
-
-The prompt is **immutable by design** — consistent output shape is the product feature. Do not change the output fields or their names without bumping `CURRENT_PROMPT_VERSION` and writing a migration path for existing descriptions.
-
-```
-Given this GitHub repo:
-- Name: {full_name}
-- GitHub description: {description}
-- Language: {language}
-- Topics: {topics}
-- README excerpt: {readme_first_500_chars}   ← "[not available]" if missing
-
-Respond ONLY with valid JSON:
+```json
 {
-  "what": "...",        // max 80 chars
-  "why": "...",         // max 80 chars
-  "use_case": "...",    // max 80 chars
-  "category": "CLI Tool | Library | Framework | Service | Learning Resource | Template | Other",
-  "tags": ["tag1"]      // 2-4 items, each max 20 chars
+  "project_definition": "...",
+  "contributor_entry_points": [],
+  "setup_requirements": [],
+  "verification_commands": [],
+  "contribution_rules": [],
+  "maturity_signals": [],
+  "cautions": [],
+  "evidence": [{ "source": "CONTRIBUTING.md", "excerpt": "..." }],
+  "unknowns": []
 }
 ```
 
-Ollama is best-effort — fail clearly if the model lacks JSON mode. No silent regex fallback.
+Invariants:
 
-## Keybindings
+- evidence excerpt는 해당 source content에 그대로 존재해야 한다.
+- `verification_commands`는 manifest/build file에서 감지한 후보만 허용한다.
+- 확인하지 못한 파일, 명령, 버전, 규칙, 활동은 `unknowns`로 보낸다.
+- AI 응답이 validation을 통과하지 못하면 deterministic brief를 유지하고 partial error를 저장한다.
+- network/API/AI 일부 실패가 기존 snapshot을 파괴하면 안 된다.
 
-| Key | Action |
-|-----|--------|
-| j / k | Navigate list |
-| gg / G | Go to top / bottom of list |
-| Ctrl+d / u | Half-page down / up (10 rows) |
-| h / l | Cycle to prev / next view (library → watching → feed) |
-| d | Describe (or hint "press shift-D to regenerate" if already described) |
-| shift-D | Describe Again — clears `llm_*` fields, re-runs; suppresses further d/shift-D until done |
-| shift-A | Batch describe — describes all undescribed + stale (`prompt_version < CURRENT`) repos sequentially |
-| o | Open in browser |
-| / | Focus search |
-| e | Edit notes + category override — **Escape discards**, save triggers on blur (click outside / j/k / Tab) |
-| , | Open settings |
-| ? | Keybinding help modal |
+## Security invariants
 
-Use React `onKeyDown` handlers (not Tauri global shortcuts) — keybindings only fire when the window is focused.
+- local path는 canonicalize한 Git root만 저장한다.
+- 저장된 root가 다른 위치로 resolve되면 접근을 거부한다.
+- local source 수집은 workspace root 밖으로 나가는 symlink를 거부한다.
+- public GitHub repository만 지원한다.
+- branch 이름은 Rust와 Git 양쪽에서 검증한다.
+- branch 생성은 `confirmed == true`일 때만 `git switch -c`를 실행한다.
+- clone, 검사 command runner, commit, push, GitHub write API, PR 생성은 현재 구현하지 않는다.
+- GitHub PAT는 `~/.eunha/config.toml`, AI connection은 `~/.eunha/connections.toml`에 `0600`으로 저장한다.
+- credential 입력은 invoke payload로 Rust에 전달될 수 있지만, 저장된 원문을 frontend로 반환하지 않는다.
+- secret을 SQLite나 log에 넣지 않는다.
 
-## Secrets
+보안 경계와 validation은 단순화를 이유로 생략하지 않는다.
 
-GitHub PAT is stored in `~/.eunha/config.toml` (0600) via `src-tauri/src/config.rs`. LLM API keys live in `~/.eunha/connections.toml` (0600) via `src-tauri/src/conduit.rs` and are only ever read by the `conduit_http` proxy — never returned to the webview. Never write secrets to SQLite. Do not use keychain or tauri-plugin-stronghold.
+## Commands
 
-## Import
+```bash
+pnpm tauri dev
+pnpm tsc --noEmit
+pnpm build
+cargo test --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+pnpm tauri build
+```
 
-Stars import uses `futures::join_all` on 5 concurrent tokio tasks (`GET /user/starred?per_page=100&page=N`). 5 tasks chosen as a safe burst under GitHub's 5000 req/hr authenticated limit. Fetch all pages — no cap. Handle primary 429 with `Retry-After`. Secondary rate limits (burst 403) are in TODOS.md for v1.1.
+변경 위험에 맞춰 가장 작은 검증부터 실행하고, migration·Git mutation·filesystem boundary를 바꾸면 Rust test를 반드시 남긴다.
 
-## Star sync
+## Legacy boundary
 
-`sync_stars` (`src-tauri/src/commands/sync.rs`) mirrors the library against the real star list: new stars are inserted, unstarred repos with `source='starred'` are deleted (manual repos are never touched). A background scheduler spawned in `lib.rs` setup runs it on the `star_sync_interval_minutes` setting (0 = off, default 360) and emits `stars:synced`; the header Sync button and Settings → Account → "Sync now" invoke it directly.
+Star import/sync, Library, Feed, Graph, Digest, Watching, Trending, Collections의 UI와 command는 active code에서 제거됐다. 데이터 삭제 없이 향후 migration/export를 결정할 수 있도록 legacy schema migration과 tables만 남아 있다.
 
-**Safety invariants:**
-- The COMPLETE star list is fetched before any DB write — a partial fetch must never reach `apply_star_sync`, or unstarred detection would delete legitimate rows.
-- Insert + delete happen in ONE transaction (`apply_star_sync` in import.rs), using temp tables for the id sets.
-- FK cascades are NOT enforced (no `PRAGMA foreign_keys`), so dependent rows in `releases`, `release_assets`, `digest_items`, `collection_items`, `repo_engagement` are deleted explicitly before the repo row.
-- A static `AtomicBool` guard prevents overlapping syncs (button vs scheduler).
-
-## Design System
-
-Linear-inspired dark-native UI. Full reference: `/Users/jinmu/Downloads/DESIGN-linear.app.md`.
-
-- **Background stack**: `#08090a` canvas (`bg-bg`) → `#0f1011` panels (`bg-panel`) → `#191a1b` cards (`bg-surface`) → `#28282c` hover (`bg-elevated`)
-- **Typography**: Inter Variable with `font-feature-settings: 'cv01', 'ss03'` globally. Signature weight `font-medium` = 510, `font-semibold` = 590. System mono fallback for `font-mono`.
-- **Accent**: Brand indigo `#5e6ad2` (`bg-brand`, `text-brand`) for primary CTAs. Interactive violet `#7170ff` (`text-accent`, `bg-accent`) for selection bars, active states, repo names.
-- **Borders**: Semi-transparent white by default — `rgba(255,255,255,0.08)` (`border-border`). Never solid dark borders on dark surfaces.
-- **Text tiers**: `text-ink` `#f7f8f8` → `text-dim` `#d0d6e0` → `text-muted` `#8a8f98` → `text-faint` `#62666d`
-- **Status tokens**: `text-success/bg-success-tint`, `text-danger/bg-danger-tint`, `text-warn/bg-warn-tint` — never raw Tailwind palette colors.
-- **Both themes**: Dark (default) + light via `html.light`. Toggle persisted in `localStorage`.
-- **Shared primitives**: `src/components/ui/Button.tsx` (variants: primary/ghost/subtle/icon), `src/components/ui/Kbd.tsx`, `src/components/ui/Modal.tsx`.
-
-## What's explicitly NOT in v1
-
-People graph, feed, cloud sync, export to markdown, README preview (`space` bar), auto-batch LLM on import, archived_at column. See TODOS.md for deferred items with context.
-
-## Skill routing
-
-When the user's request matches an available skill, invoke it via the Skill tool. When in doubt, invoke the skill.
-
-Key routing rules:
-- Product ideas/brainstorming → invoke /office-hours
-- Strategy/scope → invoke /plan-ceo-review
-- Architecture → invoke /plan-eng-review
-- Design system/plan review → invoke /design-consultation or /plan-design-review
-- Full review pipeline → invoke /autoplan
-- Bugs/errors → invoke /investigate
-- QA/testing site behavior → invoke /qa or /qa-only
-- Code review/diff check → invoke /review
-- Visual polish → invoke /design-review
-- Ship/deploy/PR → invoke /ship or /land-and-deploy
-- Save progress → invoke /context-save
-- Resume context → invoke /context-restore
-- Author a backlog-ready spec/issue → invoke /spec
+- 새 product behavior를 legacy command나 `source='starred'` 규칙 위에 만들지 않는다.
+- legacy tables 삭제는 Project/Workspace/Task 데이터 보존·export 전략이 확정된 뒤 별도 migration으로 한다.
+- 과거 Star 제품 문서는 legacy 안내가 붙은 기록일 뿐 현재 요구사항이 아니다.
