@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result};
 
-const CURRENT_SCHEMA_VERSION: u32 = 13;
+const CURRENT_SCHEMA_VERSION: u32 = 14;
 
 pub fn run(conn: &Connection) -> Result<()> {
     // WAL mode MUST be set before any schema changes — enables concurrent reads+writes
@@ -318,6 +318,48 @@ pub fn run(conn: &Connection) -> Result<()> {
                 conn.execute("INSERT OR IGNORE INTO repo_tags (repo_id, tag_id) SELECT ?1, id FROM user_tags WHERE name = ?2", rusqlite::params![repo_id, tag])?;
             }
         }
+    }
+
+    if version < 14 {
+        // The local-workspace product domain is deliberately independent from
+        // the legacy Star library. Existing rows stay intact while projects
+        // can be adopted one by one.
+        conn.execute_batch("
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                github_full_name TEXT COLLATE NOCASE UNIQUE,
+                remote_url TEXT,
+                display_name TEXT NOT NULL,
+                description TEXT,
+                role_mode TEXT NOT NULL DEFAULT 'contributor'
+                    CHECK(role_mode IN ('contributor', 'maintainer', 'owner')),
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS workspaces (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                local_path TEXT NOT NULL UNIQUE,
+                default_branch TEXT,
+                current_branch TEXT,
+                head_sha TEXT,
+                git_status_json TEXT NOT NULL DEFAULT '{}',
+                last_scanned_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_workspaces_project ON workspaces(project_id);
+
+            CREATE TABLE IF NOT EXISTS project_snapshots (
+                project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+                commit_sha TEXT,
+                readme TEXT,
+                contributing TEXT,
+                detected_tools_json TEXT NOT NULL DEFAULT '[]',
+                evidence_json TEXT NOT NULL DEFAULT '[]',
+                captured_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+        ")?;
     }
 
     conn.execute_batch(&format!("PRAGMA user_version = {};", CURRENT_SCHEMA_VERSION))?;
@@ -663,5 +705,19 @@ mod tests {
             let exists: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1", [table], |r| r.get(0)).unwrap();
             assert_eq!(exists, 1, "{table} missing");
         }
+    }
+
+    #[test]
+    fn migration_v14_creates_project_domain_without_touching_legacy_repos() {
+        let conn = open_test_db();
+        conn.execute("INSERT INTO repos (id, full_name, url, source) VALUES ('legacy/repo', 'legacy/repo', 'u', 'starred')", []).unwrap();
+        conn.execute("INSERT INTO projects (id, github_full_name, remote_url, display_name) VALUES ('github:new/project', 'new/project', 'https://github.com/new/project', 'project')", []).unwrap();
+        conn.execute("INSERT INTO workspaces (id, project_id, local_path) VALUES ('workspace:/tmp/project', 'github:new/project', '/tmp/project')", []).unwrap();
+        conn.execute("INSERT INTO project_snapshots (project_id, commit_sha) VALUES ('github:new/project', 'abc123')", []).unwrap();
+
+        let legacy: i64 = conn.query_row("SELECT COUNT(*) FROM repos WHERE id='legacy/repo'", [], |row| row.get(0)).unwrap();
+        let projects: i64 = conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0)).unwrap();
+        assert_eq!(legacy, 1);
+        assert_eq!(projects, 1);
     }
 }

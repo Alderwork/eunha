@@ -9,6 +9,7 @@ use tauri::{AppHandle, Emitter, Manager};
 static SYNC_RUNNING: AtomicBool = AtomicBool::new(false);
 
 pub const DEFAULT_SYNC_INTERVAL_MINUTES: u64 = 360; // 6h
+#[allow(dead_code)]
 const SETTING_INTERVAL: &str = "star_sync_interval_minutes";
 const SETTING_LAST_SYNC: &str = "last_star_sync_at";
 
@@ -92,6 +93,7 @@ async fn run_star_sync_inner(app: &AppHandle) -> Result<SyncStarsResult, String>
 /// (`star_sync_interval_minutes`; 0 = off) has elapsed since the last
 /// successful sync. Scheduler-driven syncs emit `stars:synced` so the frontend
 /// can refresh and toast.
+#[allow(dead_code)]
 pub fn start_star_sync_scheduler(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         // Let the app settle before the first check.
@@ -124,6 +126,7 @@ pub fn start_star_sync_scheduler(app: AppHandle) {
     });
 }
 
+#[allow(dead_code)]
 fn sync_due(last_sync: Option<&str>, interval_minutes: u64) -> bool {
     match last_sync.and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok()) {
         Some(t) => {

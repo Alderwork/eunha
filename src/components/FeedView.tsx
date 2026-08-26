@@ -75,13 +75,13 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribe, describin
   const rowVirtualizer = useVirtualizer({
     count: viewVariant === 'masonry' ? 0 : groups.length,
     getScrollElement: () => listRef.current,
-    estimateSize: (i) =>
+    estimateSize: (i: number) =>
       getLibraryRowHeight(
         feedGroupToRepo(groupsRef.current[i]),
         i === selectedIdxRef.current,
         variantRef.current,
       ),
-    getItemKey: (i) => groupsRef.current[i]?.repo_full_name ?? i,
+    getItemKey: (i: number) => groupsRef.current[i]?.repo_full_name ?? i,
     overscan: 8,
   });
 
@@ -482,7 +482,7 @@ export function FeedView({ onBack, onRepoAdded, showToast, onDescribe, describin
         return (
           <div ref={listRef} role="list" className="flex-1 overflow-y-auto">
             <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-              {rowVirtualizer.getVirtualItems().map((vItem) => {
+              {rowVirtualizer.getVirtualItems().map((vItem: { index: number; start: number }) => {
                 const group = groups[vItem.index];
                 const isSelected = vItem.index === selectedIdx;
                 const isAdding = adding.has(group.repo_full_name);

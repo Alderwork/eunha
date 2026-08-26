@@ -1,5 +1,54 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct GitStatusSummary {
+    pub branch: Option<String>,
+    pub head_sha: Option<String>,
+    pub changed_files: Vec<String>,
+    pub staged: u32,
+    pub unstaged: u32,
+    pub untracked: u32,
+    pub clean: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Workspace {
+    pub id: String,
+    pub project_id: String,
+    pub local_path: String,
+    pub default_branch: Option<String>,
+    pub current_branch: Option<String>,
+    pub head_sha: Option<String>,
+    pub git_status: GitStatusSummary,
+    pub last_scanned_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub id: String,
+    pub github_full_name: Option<String>,
+    pub remote_url: Option<String>,
+    pub display_name: String,
+    pub description: Option<String>,
+    pub role_mode: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub workspace: Option<Workspace>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectDraft {
+    pub github_full_name: Option<String>,
+    pub remote_url: Option<String>,
+    pub display_name: String,
+    pub description: Option<String>,
+    pub local_path: Option<String>,
+    pub clone_suggestion: Option<String>,
+    pub workspace_status: Option<GitStatusSummary>,
+    pub default_branch: Option<String>,
+    pub warnings: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Collection {
     pub id: i64,

@@ -426,7 +426,7 @@ export function WatchingView({ onBack, showToast, onRepoUpdated, onUnreadCountCh
             </div>
           ) : (
             <div style={{ height: repoVirtualizer.getTotalSize(), position: 'relative' }}>
-              {repoVirtualizer.getVirtualItems().map((vItem) => {
+              {repoVirtualizer.getVirtualItems().map((vItem: { index: number; start: number }) => {
                 const entry = watchedRepos[vItem.index];
                 const isSelected = vItem.index === selectedRepoIdx;
                 return (

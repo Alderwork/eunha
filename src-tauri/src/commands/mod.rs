@@ -11,6 +11,7 @@ pub mod feed;
 pub mod import;
 pub mod library;
 pub mod onboarding;
+pub mod projects;
 pub mod readme;
 pub mod similar;
 pub mod releases;

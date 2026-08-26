@@ -157,3 +157,48 @@ export interface ContributionData {
   has_contributing_md: boolean;
   github_url: string;
 }
+
+export interface GitStatusSummary {
+  branch: string | null;
+  head_sha: string | null;
+  changed_files: string[];
+  staged: number;
+  unstaged: number;
+  untracked: number;
+  clean: boolean;
+}
+
+export interface Workspace {
+  id: string;
+  project_id: string;
+  local_path: string;
+  default_branch: string | null;
+  current_branch: string | null;
+  head_sha: string | null;
+  git_status: GitStatusSummary;
+  last_scanned_at: string | null;
+}
+
+export interface Project {
+  id: string;
+  github_full_name: string | null;
+  remote_url: string | null;
+  display_name: string;
+  description: string | null;
+  role_mode: 'contributor' | 'maintainer' | 'owner';
+  created_at: string;
+  updated_at: string;
+  workspace: Workspace | null;
+}
+
+export interface ProjectDraft {
+  github_full_name: string | null;
+  remote_url: string | null;
+  display_name: string;
+  description: string | null;
+  local_path: string | null;
+  clone_suggestion: string | null;
+  workspace_status: GitStatusSummary | null;
+  default_branch: string | null;
+  warnings: string[];
+}

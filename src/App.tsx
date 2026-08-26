@@ -152,13 +152,13 @@ export default function App() {
   const rowVirtualizer = useVirtualizer({
     count: viewVariant === 'masonry' ? 0 : repos.length,
     getScrollElement: () => listRef.current,
-    estimateSize: (i) =>
+    estimateSize: (i: number) =>
       getLibraryRowHeight(
         reposRef.current[i],
         i === selectedIdxRef.current,
         variantRef.current,
       ),
-    getItemKey: (i) => reposRef.current[i]?.id ?? i,
+    getItemKey: (i: number) => reposRef.current[i]?.id ?? i,
     overscan: 10,
   });
 
@@ -1277,7 +1277,7 @@ export default function App() {
                     </div>
                   ) : (
                     <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-                      {rowVirtualizer.getVirtualItems().map((vItem) => {
+                      {rowVirtualizer.getVirtualItems().map((vItem: { index: number; start: number }) => {
                         const repo = repos[vItem.index];
                         return (
                           <div
