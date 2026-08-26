@@ -56,6 +56,8 @@ pub fn run() {
             commands::projects::get_project,
             commands::projects::set_project_role,
             commands::projects::refresh_project_workspace,
+            commands::project_brief::get_project_contribution,
+            commands::project_brief::analyze_project_contribution,
             commands::library::list_repos,
             commands::library::get_categories,
             commands::library::update_repo_user_fields,

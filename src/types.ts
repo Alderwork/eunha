@@ -185,6 +185,7 @@ export interface Project {
   remote_url: string | null;
   display_name: string;
   description: string | null;
+  default_branch: string | null;
   role_mode: 'contributor' | 'maintainer' | 'owner';
   created_at: string;
   updated_at: string;
@@ -201,4 +202,67 @@ export interface ProjectDraft {
   workspace_status: GitStatusSummary | null;
   default_branch: string | null;
   warnings: string[];
+}
+
+export interface SourceDocument {
+  source: string;
+  content: string;
+}
+
+export interface DetectedTool {
+  source: string;
+  name: string;
+  commands: string[];
+}
+
+export interface BriefEvidence {
+  source: string;
+  excerpt: string;
+}
+
+export interface ContributionBrief {
+  project_definition: string;
+  contributor_entry_points: string[];
+  setup_requirements: string[];
+  verification_commands: string[];
+  contribution_rules: string[];
+  maturity_signals: string[];
+  cautions: string[];
+  evidence: BriefEvidence[];
+  unknowns: string[];
+}
+
+export interface ProjectSnapshot {
+  project_id: string;
+  commit_sha: string | null;
+  readme: string | null;
+  contributing: string | null;
+  code_of_conduct: string | null;
+  templates: SourceDocument[];
+  detected_tools: DetectedTool[];
+  evidence: BriefEvidence[];
+  contribution_brief: ContributionBrief | null;
+  collection_errors: string[];
+  captured_at: string;
+  generated_at: string | null;
+}
+
+export interface ProjectIssue {
+  github_issue_id: number;
+  project_id: string;
+  number: number;
+  title: string;
+  body: string | null;
+  html_url: string;
+  labels: string[];
+  state: string;
+  author_login: string | null;
+  is_pull_request: boolean;
+  comments_count: number;
+  updated_at: string | null;
+}
+
+export interface ProjectContribution {
+  snapshot: ProjectSnapshot;
+  issues: ProjectIssue[];
 }

@@ -143,7 +143,7 @@ fn inspect_workspace(path: &Path) -> Result<(PathBuf, Option<String>, GitStatusS
             status.unstaged += 1;
         }
     }
-    Ok((root, default_branch(&path), status))
+    Ok((root, default_branch(path), status))
 }
 
 fn default_branch(path: &Path) -> Option<String> {
@@ -303,8 +303,8 @@ pub fn save_project(
     let mut conn = state.0.lock().map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     tx.execute(
-        "INSERT INTO projects (id, github_full_name, remote_url, display_name, description, role_mode) VALUES (?1,?2,?3,?4,?5,?6)",
-        params![id, draft.github_full_name, draft.remote_url, draft.display_name, draft.description, role_mode],
+        "INSERT INTO projects (id, github_full_name, remote_url, display_name, description, default_branch, role_mode) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+        params![id, draft.github_full_name, draft.remote_url, draft.display_name, draft.description, draft.default_branch, role_mode],
     ).map_err(|e| if e.to_string().contains("UNIQUE") { "This project or workspace is already added.".into() } else { e.to_string() })?;
     if let (Some(path), Some(status)) = (draft.local_path, draft.workspace_status) {
         tx.execute(
@@ -334,7 +334,7 @@ fn workspace_from_row(row: &Row<'_>, offset: usize) -> rusqlite::Result<Option<W
     }))
 }
 
-const PROJECT_SELECT: &str = "SELECT p.id,p.github_full_name,p.remote_url,p.display_name,p.description,p.role_mode,p.created_at,p.updated_at,w.id,w.project_id,w.local_path,w.default_branch,w.current_branch,w.head_sha,w.git_status_json,w.last_scanned_at FROM projects p LEFT JOIN workspaces w ON w.project_id=p.id";
+const PROJECT_SELECT: &str = "SELECT p.id,p.github_full_name,p.remote_url,p.display_name,p.description,p.default_branch,p.role_mode,p.created_at,p.updated_at,w.id,w.project_id,w.local_path,w.default_branch,w.current_branch,w.head_sha,w.git_status_json,w.last_scanned_at FROM projects p LEFT JOIN workspaces w ON w.project_id=p.id";
 
 fn project_from_row(row: &Row<'_>) -> rusqlite::Result<Project> {
     Ok(Project {
@@ -343,10 +343,11 @@ fn project_from_row(row: &Row<'_>) -> rusqlite::Result<Project> {
         remote_url: row.get(2)?,
         display_name: row.get(3)?,
         description: row.get(4)?,
-        role_mode: row.get(5)?,
-        created_at: row.get(6)?,
-        updated_at: row.get(7)?,
-        workspace: workspace_from_row(row, 8)?,
+        default_branch: row.get(5)?,
+        role_mode: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+        workspace: workspace_from_row(row, 9)?,
     })
 }
 

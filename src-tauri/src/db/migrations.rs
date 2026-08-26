@@ -1,6 +1,6 @@
 use rusqlite::{Connection, Result};
 
-const CURRENT_SCHEMA_VERSION: u32 = 14;
+const CURRENT_SCHEMA_VERSION: u32 = 15;
 
 pub fn run(conn: &Connection) -> Result<()> {
     // WAL mode MUST be set before any schema changes — enables concurrent reads+writes
@@ -362,6 +362,44 @@ pub fn run(conn: &Connection) -> Result<()> {
         ")?;
     }
 
+    if version < 15 {
+        conn.execute_batch(
+            "
+            ALTER TABLE projects ADD COLUMN default_branch TEXT;
+            UPDATE projects SET default_branch = (
+                SELECT default_branch FROM workspaces
+                WHERE workspaces.project_id = projects.id
+                LIMIT 1
+            ) WHERE default_branch IS NULL;
+
+            ALTER TABLE project_snapshots ADD COLUMN code_of_conduct TEXT;
+            ALTER TABLE project_snapshots ADD COLUMN templates_json TEXT NOT NULL DEFAULT '[]';
+            ALTER TABLE project_snapshots ADD COLUMN contribution_brief_json TEXT;
+            ALTER TABLE project_snapshots ADD COLUMN collection_errors_json TEXT NOT NULL DEFAULT '[]';
+            ALTER TABLE project_snapshots ADD COLUMN generated_at TEXT;
+
+            CREATE TABLE IF NOT EXISTS project_issues (
+                github_issue_id INTEGER PRIMARY KEY,
+                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                number INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT,
+                html_url TEXT NOT NULL,
+                labels_json TEXT NOT NULL DEFAULT '[]',
+                state TEXT NOT NULL,
+                author_login TEXT,
+                is_pull_request INTEGER NOT NULL DEFAULT 0,
+                comments_count INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT,
+                cached_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(project_id, number)
+            );
+            CREATE INDEX IF NOT EXISTS idx_project_issues_project
+                ON project_issues(project_id, is_pull_request, updated_at DESC);
+        ",
+        )?;
+    }
+
     conn.execute_batch(&format!("PRAGMA user_version = {};", CURRENT_SCHEMA_VERSION))?;
 
     Ok(())
@@ -719,5 +757,55 @@ mod tests {
         let projects: i64 = conn.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0)).unwrap();
         assert_eq!(legacy, 1);
         assert_eq!(projects, 1);
+    }
+
+    #[test]
+    fn migration_v15_extends_snapshots_and_adds_issue_cache() {
+        let conn = open_test_db();
+        conn.execute("INSERT INTO projects (id, github_full_name, display_name, default_branch) VALUES ('github:owner/repo', 'owner/repo', 'repo', 'main')", []).unwrap();
+        conn.execute("INSERT INTO project_snapshots (project_id, templates_json, collection_errors_json) VALUES ('github:owner/repo', '[{\"source\":\".github/ISSUE_TEMPLATE/bug.yml\",\"content\":\"name: Bug\"}]', '[]')", []).unwrap();
+        conn.execute("INSERT INTO project_issues (github_issue_id, project_id, number, title, html_url, state) VALUES (10, 'github:owner/repo', 7, 'Good first issue', 'https://github.com/owner/repo/issues/7', 'open')", []).unwrap();
+
+        let branch: String = conn.query_row("SELECT default_branch FROM projects WHERE id='github:owner/repo'", [], |row| row.get(0)).unwrap();
+        let issues: i64 = conn.query_row("SELECT COUNT(*) FROM project_issues", [], |row| row.get(0)).unwrap();
+        assert_eq!(branch, "main");
+        assert_eq!(issues, 1);
+    }
+
+    #[test]
+    fn migration_from_v14_preserves_project_snapshot_and_workspace_branch() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE projects (
+                id TEXT PRIMARY KEY, github_full_name TEXT, remote_url TEXT,
+                display_name TEXT NOT NULL, description TEXT, role_mode TEXT NOT NULL,
+                created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            );
+            CREATE TABLE workspaces (
+                id TEXT PRIMARY KEY, project_id TEXT NOT NULL, local_path TEXT NOT NULL UNIQUE,
+                default_branch TEXT, current_branch TEXT, head_sha TEXT,
+                git_status_json TEXT NOT NULL DEFAULT '{}', last_scanned_at TEXT, created_at TEXT NOT NULL
+            );
+            CREATE TABLE project_snapshots (
+                project_id TEXT PRIMARY KEY, commit_sha TEXT, readme TEXT, contributing TEXT,
+                detected_tools_json TEXT NOT NULL DEFAULT '[]', evidence_json TEXT NOT NULL DEFAULT '[]',
+                captured_at TEXT NOT NULL
+            );
+            INSERT INTO projects VALUES ('github:o/r','o/r','https://github.com/o/r','r','desc','contributor','now','now');
+            INSERT INTO workspaces VALUES ('w','github:o/r','/tmp/r','trunk','feature','abc','{}','now','now');
+            INSERT INTO project_snapshots VALUES ('github:o/r','abc','# Read me','Rules','[]','[]','now');
+            PRAGMA user_version = 14;
+            ",
+        ).unwrap();
+
+        run(&conn).unwrap();
+        let (branch, readme): (String, String) = conn.query_row(
+            "SELECT p.default_branch,s.readme FROM projects p JOIN project_snapshots s ON s.project_id=p.id",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+        assert_eq!(branch, "trunk");
+        assert_eq!(readme, "# Read me");
     }
 }
