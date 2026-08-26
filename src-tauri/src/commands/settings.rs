@@ -1,102 +1,54 @@
-use crate::db::{migrations, DbState};
-use crate::TrayState;
-use tauri::{AppHandle, State};
+use serde::Serialize;
 
-pub(crate) fn get_secret(key: &str) -> Option<String> {
-    crate::config::get_secret(key)
+#[derive(Serialize)]
+pub struct GithubSettings {
+    pat_set: bool,
+    pat_masked: String,
 }
 
-fn mask_secret(s: &str) -> String {
-    if s.is_empty() {
-        return String::new();
+fn mask_secret(secret: &str) -> String {
+    let count = secret.chars().count();
+    if count <= 4 {
+        return "•".repeat(count);
     }
-    let chars: Vec<char> = s.chars().collect();
-    let visible = chars.len().min(4);
-    let hidden = chars.len().saturating_sub(visible);
-    let dots = "•".repeat(hidden.min(24));
-    let tail: String = chars[chars.len() - visible..].iter().collect();
-    format!("{}{}", dots, tail)
+    let tail: String = secret.chars().skip(count - 4).collect();
+    format!("{}{}", "•".repeat((count - 4).min(24)), tail)
 }
 
-/// LLM provider/key/model settings are owned by Conduit connections
-/// (`crate::conduit`) — this command only handles app-level settings.
+fn github_settings() -> GithubSettings {
+    let pat = crate::config::get_secret("github_pat").unwrap_or_default();
+    GithubSettings {
+        pat_set: !pat.is_empty(),
+        pat_masked: mask_secret(&pat),
+    }
+}
+
 #[tauri::command]
 pub fn save_settings(
     github_pat: Option<String>,
-    output_language: Option<String>,
-    star_sync_interval_minutes: Option<String>,
-    default_home: Option<String>,
-    state: State<'_, DbState>,
-    _app: AppHandle,
-) -> Result<serde_json::Value, String> {
-    let mut config_error: Option<String> = None;
-
-    if let Some(pat) = github_pat {
-        if let Err(e) = crate::config::set_secret("github_pat", &pat) {
-            config_error = Some(format!("Config error (PAT): {e}"));
-        }
+    clear_github_pat: Option<bool>,
+) -> Result<GithubSettings, String> {
+    if clear_github_pat.unwrap_or(false) {
+        crate::config::set_secret("github_pat", "")?;
+    } else if let Some(pat) = github_pat.filter(|pat| !pat.trim().is_empty()) {
+        crate::config::set_secret("github_pat", pat.trim())?;
     }
-
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(lang) = output_language {
-        migrations::settings_set(&conn, "output_language", &lang)
-            .map_err(|e| e.to_string())?;
-    }
-    if let Some(interval) = star_sync_interval_minutes {
-        migrations::settings_set(&conn, "star_sync_interval_minutes", &interval)
-            .map_err(|e| e.to_string())?;
-    }
-    if let Some(home) = default_home {
-        let home = if home == "library" { "library" } else { "watching" };
-        migrations::settings_set(&conn, "default_home", home).map_err(|e| e.to_string())?;
-    }
-
-    Ok(serde_json::json!({ "keychain_error": config_error }))
+    Ok(github_settings())
 }
 
 #[tauri::command]
-pub fn get_settings(
-    state: State<'_, DbState>,
-    _app: AppHandle,
-) -> Result<serde_json::Value, String> {
-    let pat = get_secret("github_pat").unwrap_or_default();
-
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    let output_language = migrations::settings_get(&conn, "output_language")
-        .unwrap_or_else(|| "English".to_string());
-    let show_tray_icon = migrations::settings_get(&conn, "show_tray_icon")
-        .map(|v| v != "false")
-        .unwrap_or(true);
-    let star_sync_interval_minutes = migrations::settings_get(&conn, "star_sync_interval_minutes")
-        .unwrap_or_else(|| crate::commands::sync::DEFAULT_SYNC_INTERVAL_MINUTES.to_string());
-    let last_star_sync_at = migrations::settings_get(&conn, "last_star_sync_at");
-    let default_home = migrations::settings_get(&conn, "default_home").unwrap_or_else(|| "watching".to_string());
-
-    Ok(serde_json::json!({
-        "pat_set": !pat.is_empty(),
-        "pat_masked": mask_secret(&pat),
-        "output_language": output_language,
-        "show_tray_icon": show_tray_icon,
-        "star_sync_interval_minutes": star_sync_interval_minutes,
-        "last_star_sync_at": last_star_sync_at,
-        "default_home": default_home,
-    }))
+pub fn get_settings() -> GithubSettings {
+    github_settings()
 }
 
-#[tauri::command]
-pub fn set_tray_visible(
-    visible: bool,
-    tray_state: State<'_, TrayState>,
-    db_state: State<'_, DbState>,
-) -> Result<(), String> {
-    let conn = db_state.0.lock().map_err(|e| e.to_string())?;
-    migrations::settings_set(&conn, "show_tray_icon", if visible { "true" } else { "false" })
-        .map_err(|e| e.to_string())?;
-    drop(conn);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let lock = tray_state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(tray) = lock.as_ref() {
-        tray.set_visible(visible).map_err(|e| e.to_string())?;
+    #[test]
+    fn secret_mask_only_reveals_the_last_four_characters() {
+        assert_eq!(mask_secret("ghp_12345678"), "••••••••5678");
+        assert_eq!(mask_secret("abc"), "•••");
+        assert_eq!(mask_secret(""), "");
     }
-    Ok(())
 }

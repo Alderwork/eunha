@@ -4,7 +4,10 @@ use rusqlite::{params, OptionalExtension, Row};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 use tauri::State;
+
+const GITHUB_REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Debug)]
 enum ProjectInput {
@@ -106,7 +109,9 @@ pub(crate) fn git_output(root: &Path, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-pub(crate) fn inspect_workspace(path: &Path) -> Result<(PathBuf, Option<String>, GitStatusSummary), String> {
+pub(crate) fn inspect_workspace(
+    path: &Path,
+) -> Result<(PathBuf, Option<String>, GitStatusSummary), String> {
     let root_raw = git_output(path, &["rev-parse", "--show-toplevel"])
         .map_err(|_| "The selected path is not inside a Git repository.".to_string())?;
     let root = PathBuf::from(root_raw)
@@ -174,11 +179,25 @@ fn remote_origin(path: &Path) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+fn remote_list_contains(output: &str, expected: &str) -> bool {
+    output.lines().any(|line| {
+        line.split_whitespace()
+            .nth(1)
+            .and_then(parse_github_full_name)
+            .is_some_and(|name| name.eq_ignore_ascii_case(expected))
+    })
+}
+
+fn repository_has_github_remote(path: &Path, expected: &str) -> bool {
+    git_output(path, &["remote", "-v"]).is_ok_and(|output| remote_list_contains(&output, expected))
+}
+
 async fn github_metadata(full_name: &str) -> Result<GithubRepository, String> {
     let mut request = reqwest::Client::new()
         .get(format!("https://api.github.com/repos/{full_name}"))
         .header("User-Agent", "eunha/1.0")
-        .header("Accept", "application/vnd.github+json");
+        .header("Accept", "application/vnd.github+json")
+        .timeout(GITHUB_REQUEST_TIMEOUT);
     if let Some(token) = crate::config::get_secret("github_pat").filter(|token| !token.is_empty()) {
         request = request.bearer_auth(token);
     }
@@ -234,14 +253,15 @@ pub async fn inspect_project_input(input: String) -> Result<ProjectDraft, String
         ProjectInput::Local(path) => {
             let (root, default_branch, status) = inspect_workspace(&path)?;
             let remote_url = remote_origin(&root);
-            let github_full_name = remote_url.as_deref().and_then(parse_github_full_name);
+            let origin_name = remote_url.as_deref().and_then(parse_github_full_name);
             let mut warnings = Vec::new();
-            let metadata = if let Some(full_name) = github_full_name.as_deref() {
+            let metadata = if let Some(full_name) = origin_name.as_deref() {
                 match github_metadata(full_name).await {
                     Ok(metadata) => Some(metadata),
-                    Err(error) if error.contains("Private repositories") => return Err(error),
                     Err(error) => {
-                        warnings.push(error);
+                        warnings.push(format!(
+                            "{error} The repository will be saved as local-only so its files cannot be sent as public GitHub context."
+                        ));
                         None
                     }
                 }
@@ -259,8 +279,8 @@ pub async fn inspect_project_input(input: String) -> Result<ProjectDraft, String
                 })
                 .unwrap_or_else(|| "Local project".into());
             Ok(ProjectDraft {
-                github_full_name,
-                remote_url: metadata.as_ref().map(|m| m.html_url.clone()).or(remote_url),
+                github_full_name: metadata.as_ref().map(|m| m.full_name.clone()),
+                remote_url: metadata.as_ref().map(|m| m.html_url.clone()),
                 display_name,
                 description: metadata.and_then(|m| m.description),
                 local_path: Some(root.to_string_lossy().to_string()),
@@ -271,6 +291,89 @@ pub async fn inspect_project_input(input: String) -> Result<ProjectDraft, String
             })
         }
     }
+}
+
+fn validate_display_name(name: String) -> Result<String, String> {
+    let name = name.trim().to_string();
+    if name.is_empty() || name.chars().count() > 120 {
+        return Err("Project display name must be between 1 and 120 characters.".into());
+    }
+    Ok(name)
+}
+
+async fn validate_project_draft(draft: ProjectDraft) -> Result<ProjectDraft, String> {
+    let requested_name = match draft.github_full_name.as_deref() {
+        Some(name) => Some(
+            parse_github_full_name(name)
+                .ok_or_else(|| "The project has an invalid GitHub repository name.".to_string())?,
+        ),
+        None => None,
+    };
+
+    if let Some(local_path) = draft.local_path.as_deref() {
+        let local_path = local_path.trim();
+        if local_path.is_empty() {
+            return Err("Local path is required.".into());
+        }
+        let canonical = expand_local_path(local_path)
+            .canonicalize()
+            .map_err(|_| "Local path does not exist or cannot be accessed.".to_string())?;
+        let (root, workspace_default_branch, status) = inspect_workspace(&canonical)?;
+        let metadata = if let Some(expected) = requested_name.as_deref() {
+            if !repository_has_github_remote(&root, expected) {
+                return Err(format!("No configured GitHub remote matches {expected}."));
+            }
+            Some(github_metadata(expected).await?)
+        } else {
+            None
+        };
+        let display_name = validate_display_name(
+            metadata
+                .as_ref()
+                .map(|repository| repository.name.clone())
+                .or_else(|| {
+                    root.file_name()
+                        .map(|name| name.to_string_lossy().to_string())
+                })
+                .unwrap_or_else(|| "Local project".into()),
+        )?;
+        let default_branch = metadata
+            .as_ref()
+            .and_then(|repository| repository.default_branch.clone())
+            .or(workspace_default_branch);
+        return Ok(ProjectDraft {
+            github_full_name: metadata
+                .as_ref()
+                .map(|repository| repository.full_name.clone()),
+            remote_url: metadata
+                .as_ref()
+                .map(|repository| repository.html_url.clone()),
+            display_name,
+            description: metadata.and_then(|repository| repository.description),
+            local_path: Some(root.to_string_lossy().to_string()),
+            clone_suggestion: None,
+            workspace_status: Some(status),
+            default_branch,
+            warnings: Vec::new(),
+        });
+    }
+
+    let requested_name = requested_name.ok_or_else(|| {
+        "A project requires a verified GitHub repository or local path.".to_string()
+    })?;
+    let metadata = github_metadata(&requested_name).await?;
+    let display_name = validate_display_name(metadata.name.clone())?;
+    Ok(ProjectDraft {
+        github_full_name: Some(metadata.full_name.clone()),
+        remote_url: Some(metadata.html_url),
+        display_name,
+        description: metadata.description,
+        local_path: None,
+        clone_suggestion: Some(clone_suggestion(&metadata.full_name)),
+        workspace_status: None,
+        default_branch: metadata.default_branch,
+        warnings: Vec::new(),
+    })
 }
 
 fn project_id(draft: &ProjectDraft) -> String {
@@ -291,7 +394,7 @@ pub(crate) fn workspace_id(path: &str) -> String {
 }
 
 #[tauri::command]
-pub fn save_project(
+pub async fn save_project(
     draft: ProjectDraft,
     role_mode: String,
     state: State<'_, DbState>,
@@ -299,6 +402,7 @@ pub fn save_project(
     if !matches!(role_mode.as_str(), "contributor" | "maintainer" | "owner") {
         return Err("Invalid project role.".into());
     }
+    let draft = validate_project_draft(draft).await?;
     let id = project_id(&draft);
     let mut conn = state.0.lock().map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
@@ -334,7 +438,7 @@ fn workspace_from_row(row: &Row<'_>, offset: usize) -> rusqlite::Result<Option<W
     }))
 }
 
-const PROJECT_SELECT: &str = "SELECT p.id,p.github_full_name,p.remote_url,p.display_name,p.description,p.default_branch,p.role_mode,p.created_at,p.updated_at,w.id,w.project_id,w.local_path,w.default_branch,w.current_branch,w.head_sha,w.git_status_json,w.last_scanned_at FROM projects p LEFT JOIN workspaces w ON w.project_id=p.id";
+const PROJECT_SELECT: &str = "SELECT p.id,p.github_full_name,p.remote_url,p.display_name,p.description,p.default_branch,p.role_mode,strftime('%Y-%m-%dT%H:%M:%SZ',p.created_at),strftime('%Y-%m-%dT%H:%M:%SZ',p.updated_at),w.id,w.project_id,w.local_path,w.default_branch,w.current_branch,w.head_sha,w.git_status_json,strftime('%Y-%m-%dT%H:%M:%SZ',w.last_scanned_at) FROM projects p LEFT JOIN workspaces w ON w.project_id=p.id";
 
 fn project_from_row(row: &Row<'_>) -> rusqlite::Result<Project> {
     Ok(Project {
@@ -383,29 +487,6 @@ pub fn get_project(project_id: String, state: State<'_, DbState>) -> Result<Proj
 }
 
 #[tauri::command]
-pub fn set_project_role(
-    project_id: String,
-    role_mode: String,
-    state: State<'_, DbState>,
-) -> Result<Project, String> {
-    if !matches!(role_mode.as_str(), "contributor" | "maintainer" | "owner") {
-        return Err("Invalid project role.".into());
-    }
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    let changed = conn
-        .execute(
-            "UPDATE projects SET role_mode=?1,updated_at=datetime('now') WHERE id=?2",
-            params![role_mode, project_id],
-        )
-        .map_err(|e| e.to_string())?;
-    drop(conn);
-    if changed == 0 {
-        return Err("Project not found.".into());
-    }
-    get_project_inner(&state, &project_id)
-}
-
-#[tauri::command]
 pub fn refresh_project_workspace(
     project_id: String,
     state: State<'_, DbState>,
@@ -445,8 +526,6 @@ pub fn connect_project_workspace(
         .map_err(|_| "Local path does not exist or cannot be accessed.".to_string())?;
     let (root, default_branch, status) = inspect_workspace(&path)?;
     let root_string = root.to_string_lossy().to_string();
-    let remote = remote_origin(&root);
-    let remote_name = remote.as_deref().and_then(parse_github_full_name);
 
     let expected_name: Option<String> = {
         let conn = state.0.lock().map_err(|e| e.to_string())?;
@@ -460,30 +539,30 @@ pub fn connect_project_workspace(
         .ok_or_else(|| "Project not found.".to_string())?
     };
     if let Some(expected) = expected_name {
-        if remote_name.as_deref() != Some(expected.as_str()) {
-            return Err(format!(
-                "The selected repository origin does not match {expected}."
-            ));
+        if !repository_has_github_remote(&root, &expected) {
+            return Err(format!("No configured GitHub remote matches {expected}."));
         }
     }
 
     let id = workspace_id(&root_string);
     let status_json = serde_json::to_string(&status).map_err(|e| e.to_string())?;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.execute(
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute(
         "INSERT INTO workspaces (id, project_id, local_path, default_branch, current_branch, head_sha, git_status_json, last_scanned_at)
          VALUES (?1,?2,?3,?4,?5,?6,?7,datetime('now'))",
         params![id, project_id, root_string, default_branch, status.branch, status.head_sha, status_json],
     )
     .map_err(|e| if e.to_string().contains("UNIQUE") { "This local workspace is already connected.".into() } else { e.to_string() })?;
-    conn.execute(
+    tx.execute(
         "UPDATE contribution_tasks SET workspace_id=?1,updated_at=datetime('now') WHERE project_id=?2 AND workspace_id IS NULL",
         params![id, project_id],
     ).map_err(|e| e.to_string())?;
-    conn.execute(
+    tx.execute(
         "UPDATE projects SET default_branch=COALESCE(default_branch,?1),updated_at=datetime('now') WHERE id=?2",
         params![default_branch, project_id],
     ).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     drop(conn);
     get_project_inner(&state, &project_id)
 }
@@ -518,6 +597,14 @@ mod tests {
         assert!(
             matches!(normalize_input("/definitely/not/a/real/eunha/path"), Err(message) if message.contains("does not exist"))
         );
+    }
+
+    #[test]
+    fn remote_list_accepts_an_upstream_match_for_a_fork() {
+        let remotes = "origin\tgit@github.com:contributor/project.git (fetch)\norigin\tgit@github.com:contributor/project.git (push)\nupstream\thttps://github.com/owner/project.git (fetch)\nupstream\thttps://github.com/owner/project.git (push)";
+        assert!(remote_list_contains(remotes, "owner/project"));
+        assert!(remote_list_contains(remotes, "CONTRIBUTOR/PROJECT"));
+        assert!(!remote_list_contains(remotes, "other/project"));
     }
 
     #[test]

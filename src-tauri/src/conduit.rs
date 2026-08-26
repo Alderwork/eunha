@@ -1,14 +1,43 @@
-//! Conduit bridge: connection storage (`~/.eunha/connections.toml`, 0600) and
-//! the credential-injecting HTTP proxy the TS `@conduit/core` talks to.
+//! AI connection storage in `~/.eunha/connections.toml`.
 //!
-//! Security model: the webview never receives API keys. `conduit_list` strips
-//! them; `conduit_http` is the only code path that touches them, and it only
-//! injects keys into requests whose target host is on the proxy allowlist.
+//! The webview can save or replace a key, but list responses never return it.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+const SUPPORTED_PROVIDERS: &[&str] =
+    &["openai", "anthropic", "openrouter", "opencode-go", "ollama"];
+const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
+
+pub(crate) fn provider_supported(provider: &str) -> bool {
+    SUPPORTED_PROVIDERS.contains(&provider)
+}
+
+pub(crate) fn ollama_base(meta: &HashMap<String, String>) -> Result<String, String> {
+    let raw = meta
+        .get("base_url")
+        .map(String::as_str)
+        .unwrap_or(DEFAULT_OLLAMA_URL)
+        .trim()
+        .trim_end_matches('/');
+    let url = reqwest::Url::parse(raw).map_err(|_| "Enter a valid Ollama Base URL.".to_string())?;
+    let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"));
+    if !local
+        || !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || !matches!(url.path(), "" | "/")
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(
+            "Ollama must use a local HTTP(S) Base URL without a path or credentials.".into(),
+        );
+    }
+    Ok(raw.to_string())
+}
 
 // ── Storage (TOML, snake_case) ───────────────────────────
 
@@ -72,8 +101,7 @@ pub fn write_connections(file: &ConnectionsFile) -> Result<(), String> {
     write_connections_to(&crate::config::home_dir(), file)
 }
 
-/// Upsert by id. A save that carries no key never wipes an existing one:
-/// JS-side status updates omit credentials, key entries include them.
+/// Upsert by id. A save that carries no key never wipes an existing one.
 pub fn upsert(file: &mut ConnectionsFile, record: ConnectionRecord) {
     match file.connections.iter_mut().find(|c| c.id == record.id) {
         Some(existing) => {
@@ -89,36 +117,66 @@ pub fn upsert(file: &mut ConnectionsFile, record: ConnectionRecord) {
     }
 }
 
-// ── IPC boundary (camelCase JSON, matching TS StoredConnection) ──
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectionInput {
-    pub id: String,
-    pub provider: String,
-    pub status: String,
-    pub credentials: Option<String>,
-    pub default_model: Option<String>,
-    pub validated_at: Option<String>,
-    pub meta: Option<HashMap<String, String>>,
-    pub created_at: String,
-    pub updated_at: String,
+fn require_connection_key(file: &ConnectionsFile, record: &ConnectionRecord) -> Result<(), String> {
+    let saved_key = file
+        .connections
+        .iter()
+        .find(|connection| connection.id == record.id)
+        .and_then(|connection| connection.api_key.as_deref())
+        .is_some_and(|key| !key.is_empty());
+    if record.provider != "ollama" && record.api_key.is_none() && !saved_key {
+        return Err("Enter an API key for this provider.".into());
+    }
+    Ok(())
 }
 
-impl From<ConnectionInput> for ConnectionRecord {
-    fn from(input: ConnectionInput) -> Self {
-        ConnectionRecord {
-            id: input.id,
-            provider: input.provider,
-            status: input.status,
-            api_key: input.credentials.filter(|k| !k.is_empty()),
-            default_model: input.default_model,
-            validated_at: input.validated_at,
-            meta: input.meta,
-            created_at: input.created_at,
-            updated_at: input.updated_at,
-        }
+// ── IPC boundary ─────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ConnectionInput {
+    pub provider: String,
+    pub credentials: Option<String>,
+    pub default_model: Option<String>,
+    pub meta: Option<HashMap<String, String>>,
+}
+
+fn record_from_input(input: ConnectionInput) -> Result<ConnectionRecord, String> {
+    if !provider_supported(&input.provider) {
+        return Err("Unsupported AI provider.".into());
     }
+    let model = input
+        .default_model
+        .map(|model| model.trim().to_string())
+        .filter(|model| !model.is_empty() && model.len() <= 200)
+        .ok_or("Enter a model identifier up to 200 characters.")?;
+    let api_key = input
+        .credentials
+        .map(|key| key.trim().to_string())
+        .filter(|key| !key.is_empty());
+    if api_key.as_ref().is_some_and(|key| key.len() > 8_192) {
+        return Err("AI API keys are limited to 8,192 characters.".into());
+    }
+    let meta = if input.provider == "ollama" {
+        Some(HashMap::from([(
+            "base_url".into(),
+            ollama_base(&input.meta.unwrap_or_default())?,
+        )]))
+    } else {
+        None
+    };
+    let now = chrono::Utc::now().to_rfc3339();
+    Ok(ConnectionRecord {
+        id: input.provider.clone(),
+        provider: input.provider,
+        status: "configured".into(),
+        api_key,
+        default_model: Some(model),
+        validated_at: None,
+        meta,
+        created_at: now.clone(),
+        updated_at: now,
+    })
 }
 
 fn record_to_ipc(c: &ConnectionRecord) -> serde_json::Value {
@@ -146,7 +204,9 @@ pub fn conduit_list() -> Result<serde_json::Value, String> {
 #[tauri::command]
 pub fn conduit_save(input: ConnectionInput) -> Result<(), String> {
     let mut file = read_connections();
-    upsert(&mut file, input.into());
+    let record = record_from_input(input)?;
+    require_connection_key(&file, &record)?;
+    upsert(&mut file, record);
     write_connections(&file)
 }
 
@@ -172,180 +232,6 @@ pub fn conduit_set_active(id: Option<String>) -> Result<(), String> {
     write_connections(&file)
 }
 
-// ── HTTP proxy with credential injection ─────────────────
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum AuthScheme {
-    Bearer,
-    Header {
-        name: String,
-        extra: Option<HashMap<String, String>>,
-    },
-    Query {
-        name: String,
-    },
-    None,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ProxyRequest {
-    pub method: String,
-    pub url: String,
-    pub headers: Option<HashMap<String, String>>,
-    pub body: Option<String>,
-}
-
-/// Remote hosts the proxy will attach credentials to. Localhost is always
-/// allowed (self-hosted providers like Ollama carry no key).
-/// Adding a provider to Conduit means adding its host here.
-const ALLOWED_REMOTE_HOSTS: &[&str] = &[
-    "api.openai.com",
-    "api.anthropic.com",
-    "generativelanguage.googleapis.com",
-    "openrouter.ai",
-    "opencode.ai",
-    "api.deepseek.com",
-    "api.x.ai",
-    "dashscope-intl.aliyuncs.com",
-    "dashscope.aliyuncs.com",
-    "api.z.ai",
-    "api.moonshot.ai",
-    "api.moonshot.cn",
-    "api.minimax.io",
-    "api.minimaxi.com",
-    "api.stepfun.com",
-    "api.xiaomimimo.com",
-    "api.upstage.ai",
-    "api.arcee.ai",
-    "integrate.api.nvidia.com",
-    "router.huggingface.co",
-    "api.fireworks.ai",
-    "api.deepinfra.com",
-    "api.novita.ai",
-    "api.gmi-serving.com",
-    "ollama.com",
-    "api.kilo.ai",
-    "inference-api.nousresearch.com",
-    "tokenhub.tencentmaas.com",
-    "api.githubcopilot.com",
-];
-
-/// Azure OpenAI / Foundry endpoints are per-resource subdomains.
-fn is_azure_openai_host(host: &str) -> bool {
-    host == "openai.azure.com" || host.ends_with(".openai.azure.com")
-}
-
-fn is_localhost_host(host: &str) -> bool {
-    host == "localhost" || host == "127.0.0.1" || host == "::1"
-}
-
-pub fn url_allowed(url: &str) -> bool {
-    let Ok(parsed) = reqwest::Url::parse(url) else {
-        return false;
-    };
-    match parsed.host_str() {
-        Some(host) if is_localhost_host(host) => true,
-        Some(host) => ALLOWED_REMOTE_HOSTS.contains(&host) || is_azure_openai_host(host),
-        None => false,
-    }
-}
-
-async fn proxy_send(
-    home: &Path,
-    connection_id: &str,
-    auth: &AuthScheme,
-    request: &ProxyRequest,
-) -> Result<serde_json::Value, String> {
-    if !url_allowed(&request.url) {
-        return Err(format!("Blocked by proxy allowlist: {}", request.url));
-    }
-
-    let file = read_connections_from(home);
-    let conn = file.connections.iter().find(|c| c.id == connection_id);
-
-    // Keep the "Ollama is auto-managed" invariant for proxied localhost
-    // calls — for the Ollama provider only, so other localhost providers
-    // (LM Studio) never spawn `ollama serve` on their port.
-    if let Some(conn) = conn {
-        if conn.provider == "ollama" {
-            if let Ok(parsed) = reqwest::Url::parse(&request.url) {
-                if parsed.host_str().is_some_and(is_localhost_host) {
-                    crate::ollama::ensure_running(&parsed.origin().ascii_serialization()).await?;
-                }
-            }
-        }
-    }
-
-    // The key is read here, injected here, and never returned to the caller.
-    let key: Option<String> = match auth {
-        AuthScheme::None => None,
-        _ => Some(
-            conn.ok_or_else(|| format!("Unknown connection: {connection_id}"))?
-                .api_key
-                .clone()
-                .filter(|k| !k.is_empty())
-                .ok_or_else(|| format!("No API key stored for connection: {connection_id}"))?,
-        ),
-    };
-
-    let method = reqwest::Method::from_bytes(request.method.as_bytes())
-        .map_err(|e| format!("Invalid method: {e}"))?;
-
-    let mut url = request.url.clone();
-    if let (AuthScheme::Query { name }, Some(k)) = (auth, &key) {
-        let mut parsed = reqwest::Url::parse(&url).map_err(|e| format!("Invalid URL: {e}"))?;
-        parsed.query_pairs_mut().append_pair(name, k);
-        url = parsed.to_string();
-    }
-
-    let client = reqwest::Client::new();
-    let mut req = client.request(method, &url);
-    if let Some(headers) = &request.headers {
-        for (k, v) in headers {
-            req = req.header(k, v);
-        }
-    }
-    match (auth, &key) {
-        (AuthScheme::Bearer, Some(k)) => {
-            req = req.bearer_auth(k);
-        }
-        (AuthScheme::Header { name, extra }, Some(k)) => {
-            req = req.header(name, k);
-            if let Some(extra) = extra {
-                for (hk, hv) in extra {
-                    req = req.header(hk, hv);
-                }
-            }
-        }
-        _ => {}
-    }
-    if let Some(body) = &request.body {
-        req = req.header("Content-Type", "application/json").body(body.clone());
-    }
-
-    let resp = req
-        .timeout(std::time::Duration::from_secs(20))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
-    let status = resp.status().as_u16();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read response body: {e}"))?;
-    Ok(serde_json::json!({ "status": status, "body": body }))
-}
-
-#[tauri::command]
-pub async fn conduit_http(
-    connection_id: String,
-    auth: AuthScheme,
-    request: ProxyRequest,
-) -> Result<serde_json::Value, String> {
-    proxy_send(&crate::config::home_dir(), &connection_id, &auth, &request).await
-}
-
 // ── One-time migration from legacy settings ──────────────
 
 /// config.toml's `llm_api_key` + sqlite `llm_provider`/`ollama_*`/
@@ -360,9 +246,10 @@ pub fn migrate_legacy_llm_settings_from(
     }
     use crate::db::migrations::settings_get;
 
-    let legacy_key = crate::config::read_from(home).llm_api_key.filter(|k| !k.is_empty());
-    let provider =
-        settings_get(conn, "llm_provider").unwrap_or_else(|| "openai".to_string());
+    let legacy_key = crate::config::read_from(home)
+        .llm_api_key
+        .filter(|k| !k.is_empty());
+    let provider = settings_get(conn, "llm_provider").unwrap_or_else(|| "openai".to_string());
 
     // Fresh install: nothing to migrate — the user will connect via the UI.
     if legacy_key.is_none() && provider != "ollama" {
@@ -421,11 +308,8 @@ mod tests {
     use super::*;
 
     fn temp_home(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "eunha-conduit-test-{}-{}",
-            tag,
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("eunha-conduit-test-{}-{}", tag, std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -510,36 +394,44 @@ mod tests {
     }
 
     #[test]
-    fn proxy_allowlist() {
-        assert!(url_allowed("https://api.openai.com/v1/models"));
-        assert!(url_allowed("https://api.anthropic.com/v1/models"));
-        assert!(url_allowed(
-            "https://generativelanguage.googleapis.com/v1beta/models"
-        ));
-        assert!(url_allowed("https://openrouter.ai/api/v1/models"));
-        assert!(url_allowed("http://localhost:11434/api/tags"));
-        assert!(url_allowed("http://127.0.0.1:11434/api/version"));
+    fn connection_input_rejects_unsupported_providers_and_remote_ollama() {
+        let input = |provider: &str, base_url: Option<&str>| ConnectionInput {
+            provider: provider.into(),
+            credentials: Some("secret".into()),
+            default_model: Some("model".into()),
+            meta: base_url.map(|url| HashMap::from([("base_url".into(), url.into())])),
+        };
 
-        // Preset providers added with the expanded registry.
-        assert!(url_allowed("https://api.deepseek.com/models"));
-        assert!(url_allowed("https://api.x.ai/v1/models"));
-        assert!(url_allowed(
-            "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models"
-        ));
-        assert!(url_allowed("https://api.moonshot.cn/v1/models"));
-        assert!(url_allowed("https://router.huggingface.co/v1/models"));
-        assert!(url_allowed("https://ollama.com/v1/models"));
+        assert!(record_from_input(input("openai", None)).is_ok());
+        assert!(record_from_input(input("unknown", None)).is_err());
+        assert!(record_from_input(input("ollama", Some("https://example.com"))).is_err());
+        assert_eq!(
+            record_from_input(input("ollama", Some("http://127.0.0.1:11434/")))
+                .unwrap()
+                .meta
+                .unwrap()["base_url"],
+            "http://127.0.0.1:11434"
+        );
+    }
 
-        // Azure Foundry: per-resource subdomains of openai.azure.com.
-        assert!(url_allowed(
-            "https://my-resource.openai.azure.com/openai/v1/models"
-        ));
+    #[test]
+    fn remote_provider_requires_a_new_or_saved_key() {
+        let record = ConnectionRecord {
+            id: "openai".into(),
+            provider: "openai".into(),
+            ..Default::default()
+        };
+        assert!(require_connection_key(&ConnectionsFile::default(), &record).is_err());
 
-        assert!(!url_allowed("https://evil.example.com/collect"));
-        assert!(!url_allowed("https://api.openai.com.evil.com/v1/models"));
-        assert!(!url_allowed("https://openai.azure.com.evil.com/openai/v1/models"));
-        assert!(!url_allowed("https://notopenai.azure.com/openai/v1/models"));
-        assert!(!url_allowed("not a url"));
+        let saved = ConnectionsFile {
+            connections: vec![ConnectionRecord {
+                id: "openai".into(),
+                api_key: Some("sk-saved".into()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert!(require_connection_key(&saved, &record).is_ok());
     }
 
     #[test]
@@ -564,7 +456,10 @@ mod tests {
         let rec = &file.connections[0];
         assert_eq!(rec.provider, "anthropic");
         assert_eq!(rec.api_key.as_deref(), Some("sk-ant-legacy"));
-        assert_eq!(rec.default_model.as_deref(), Some("claude-haiku-4-5-20251001"));
+        assert_eq!(
+            rec.default_model.as_deref(),
+            Some("claude-haiku-4-5-20251001")
+        );
         assert_eq!(rec.status, "ready");
 
         // legacy key removed, PAT kept
@@ -593,7 +488,10 @@ mod tests {
         assert_eq!(rec.provider, "ollama");
         assert_eq!(rec.api_key, None);
         assert_eq!(
-            rec.meta.as_ref().and_then(|m| m.get("base_url")).map(String::as_str),
+            rec.meta
+                .as_ref()
+                .and_then(|m| m.get("base_url"))
+                .map(String::as_str),
             Some("http://127.0.0.1:11434")
         );
         assert_eq!(rec.default_model.as_deref(), Some("llama3.2"));
@@ -607,151 +505,5 @@ mod tests {
         migrate_legacy_llm_settings_from(&home, &conn).unwrap();
         assert!(!connections_path_from(&home).exists());
         let _ = fs::remove_dir_all(&home);
-    }
-
-    /// End-to-end: the proxy reads the key from connections.toml and injects
-    /// it into the outgoing request — the response carries no key material.
-    /// A non-Ollama provider must NOT trigger the auto-manage health probe.
-    #[tokio::test]
-    async fn proxy_injects_bearer_key_from_storage() {
-        let home = temp_home("proxy");
-        write_connections_to(
-            &home,
-            &ConnectionsFile {
-                active: Some("openai".into()),
-                connections: vec![ConnectionRecord {
-                    id: "openai".into(),
-                    provider: "openai".into(),
-                    status: "ready".into(),
-                    api_key: Some("sk-secret".into()),
-                    ..Default::default()
-                }],
-            },
-        )
-        .unwrap();
-
-        let requests = serve_n_requests(1);
-        let addr = requests.addr;
-
-        let res = proxy_send(
-            &home,
-            "openai",
-            &AuthScheme::Bearer,
-            &ProxyRequest {
-                method: "GET".into(),
-                url: format!("http://{addr}/v1/models"),
-                headers: None,
-                body: None,
-            },
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(res["status"], 200);
-        let requests = requests.join();
-        assert_eq!(requests.len(), 1);
-        let proxied = requests[0].to_lowercase();
-        assert!(
-            proxied.contains("authorization: bearer sk-secret"),
-            "proxied request missing injected key:\n{proxied}"
-        );
-        // The response to the webview carries status + body only.
-        assert!(res.get("api_key").is_none());
-        let _ = fs::remove_dir_all(&home);
-    }
-
-    /// The Ollama provider keeps the auto-manage invariant: a health probe
-    /// hits the server first (no credentials), then the proxied request.
-    #[tokio::test]
-    async fn proxy_probes_ollama_health_before_localhost_request() {
-        let home = temp_home("proxy-ollama");
-        write_connections_to(
-            &home,
-            &ConnectionsFile {
-                active: Some("ollama".into()),
-                connections: vec![ConnectionRecord {
-                    id: "ollama".into(),
-                    provider: "ollama".into(),
-                    status: "ready".into(),
-                    ..Default::default()
-                }],
-            },
-        )
-        .unwrap();
-
-        let requests = serve_n_requests(2);
-        let addr = requests.addr;
-
-        let res = proxy_send(
-            &home,
-            "ollama",
-            &AuthScheme::None,
-            &ProxyRequest {
-                method: "GET".into(),
-                url: format!("http://{addr}/api/tags"),
-                headers: None,
-                body: None,
-            },
-        )
-        .await
-        .unwrap();
-
-        assert_eq!(res["status"], 200);
-        let requests = requests.join();
-        assert_eq!(requests.len(), 2);
-        assert!(
-            requests[0].to_lowercase().contains("/api/version"),
-            "first request should be the ollama health probe:\n{}",
-            requests[0]
-        );
-        let _ = fs::remove_dir_all(&home);
-    }
-
-    /// A tiny HTTP server that answers `n` requests with `{}` and records them.
-    fn serve_n_requests(n: usize) -> ServedRequests {
-        use std::io::{Read, Write};
-        use std::net::TcpListener;
-
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let handle = std::thread::spawn(move || {
-            let mut requests: Vec<String> = Vec::new();
-            for _ in 0..n {
-                let (mut stream, _) = listener.accept().unwrap();
-                let mut buf = Vec::new();
-                let mut chunk = [0u8; 1024];
-                loop {
-                    let n = stream.read(&mut chunk).unwrap();
-                    if n == 0 {
-                        break;
-                    }
-                    buf.extend_from_slice(&chunk[..n]);
-                    if buf.windows(4).any(|w| w == b"\r\n\r\n") {
-                        break;
-                    }
-                }
-                requests.push(String::from_utf8_lossy(&buf).to_string());
-                let body = "{}";
-                let resp = format!(
-                    "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
-                    body.len(),
-                    body
-                );
-                stream.write_all(resp.as_bytes()).unwrap();
-            }
-            requests
-        });
-        ServedRequests { addr, handle }
-    }
-
-    struct ServedRequests {
-        addr: std::net::SocketAddr,
-        handle: std::thread::JoinHandle<Vec<String>>,
-    }
-
-    impl ServedRequests {
-        fn join(self) -> Vec<String> {
-            self.handle.join().unwrap()
-        }
     }
 }

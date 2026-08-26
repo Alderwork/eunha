@@ -1,5 +1,5 @@
-use crate::commands::describe::{call_llm, get_llm_settings};
 use crate::db::DbState;
+use crate::llm::{call_llm, get_llm_settings};
 use crate::models::{
     BriefEvidence, ContributionBrief, DetectedTool, ProjectContribution, ProjectIssue,
     ProjectSnapshot, SourceDocument,
@@ -106,6 +106,7 @@ struct GithubUser {
 fn github_request(client: &reqwest::Client, url: &str) -> reqwest::RequestBuilder {
     let request = client
         .get(url)
+        .timeout(std::time::Duration::from_secs(20))
         .header("User-Agent", "eunha/1.0")
         .header("Accept", "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28");
@@ -126,6 +127,10 @@ async fn response_error(response: reqwest::Response, label: &str) -> String {
             == Some("0");
     if rate_limited {
         return "GitHub API rate limit reached. Cached project data is still available.".into();
+    }
+    if status == reqwest::StatusCode::UNAUTHORIZED {
+        return "GitHub authentication failed. Update or remove the saved token in Settings."
+            .into();
     }
     let detail = response.text().await.unwrap_or_default();
     if detail.is_empty() {
@@ -841,7 +846,7 @@ fn issue_from_row(row: &Row<'_>) -> rusqlite::Result<ProjectIssue> {
 }
 
 fn load_issues(conn: &rusqlite::Connection, project_id: &str) -> Result<Vec<ProjectIssue>, String> {
-    let mut statement = conn.prepare("SELECT github_issue_id,project_id,number,title,body,html_url,labels_json,state,author_login,is_pull_request,comments_count,updated_at FROM project_issues WHERE project_id=?1 ORDER BY is_pull_request,updated_at DESC").map_err(|error| error.to_string())?;
+    let mut statement = conn.prepare("SELECT i.github_issue_id,i.project_id,i.number,i.title,i.body,i.html_url,i.labels_json,i.state,i.author_login,i.is_pull_request,i.comments_count,i.updated_at FROM project_issues i JOIN project_snapshots s ON s.project_id=i.project_id WHERE i.project_id=?1 AND i.cached_at>=s.captured_at ORDER BY i.is_pull_request,i.updated_at DESC").map_err(|error| error.to_string())?;
     let issues = statement
         .query_map([project_id], issue_from_row)
         .map_err(|error| error.to_string())?
@@ -877,7 +882,7 @@ fn load_contribution_inner(
     project_id: &str,
 ) -> Result<Option<ProjectContribution>, String> {
     let conn = state.0.lock().map_err(|error| error.to_string())?;
-    let snapshot = conn.query_row("SELECT project_id,commit_sha,readme,contributing,code_of_conduct,templates_json,detected_tools_json,evidence_json,contribution_brief_json,collection_errors_json,captured_at,generated_at FROM project_snapshots WHERE project_id=?1", [project_id], snapshot_from_row).optional().map_err(|error| error.to_string())?;
+    let snapshot = conn.query_row("SELECT project_id,commit_sha,readme,contributing,code_of_conduct,templates_json,detected_tools_json,evidence_json,contribution_brief_json,collection_errors_json,strftime('%Y-%m-%dT%H:%M:%SZ',captured_at),strftime('%Y-%m-%dT%H:%M:%SZ',generated_at) FROM project_snapshots WHERE project_id=?1", [project_id], snapshot_from_row).optional().map_err(|error| error.to_string())?;
     match snapshot {
         Some(snapshot) => Ok(Some(ProjectContribution {
             snapshot,
@@ -887,13 +892,29 @@ fn load_contribution_inner(
     }
 }
 
+fn replace_issue_sample(
+    tx: &rusqlite::Transaction<'_>,
+    project_id: &str,
+    issues: &[ProjectIssue],
+) -> Result<(), String> {
+    tx.execute(
+        "DELETE FROM project_issues WHERE project_id=?1 AND github_issue_id NOT IN (SELECT issue_id FROM contribution_tasks WHERE project_id=?1 AND issue_id IS NOT NULL)",
+        [project_id],
+    )
+    .map_err(|error| error.to_string())?;
+    for issue in issues {
+        tx.execute("INSERT INTO project_issues (github_issue_id,project_id,number,title,body,html_url,labels_json,state,author_login,is_pull_request,comments_count,updated_at,cached_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,datetime('now')) ON CONFLICT(github_issue_id) DO UPDATE SET project_id=excluded.project_id,number=excluded.number,title=excluded.title,body=excluded.body,html_url=excluded.html_url,labels_json=excluded.labels_json,state=excluded.state,author_login=excluded.author_login,is_pull_request=excluded.is_pull_request,comments_count=excluded.comments_count,updated_at=excluded.updated_at,cached_at=datetime('now')", params![issue.github_issue_id,issue.project_id,issue.number,issue.title,issue.body,issue.html_url,serde_json::to_string(&issue.labels).map_err(|error| error.to_string())?,issue.state,issue.author_login,issue.is_pull_request as i64,issue.comments_count,issue.updated_at]).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
 fn save_analysis(
     state: &State<'_, DbState>,
     context: &ProjectContext,
     sources: &CollectedSources,
     tools: &[DetectedTool],
     brief: &ContributionBrief,
-    issues: Option<&[ProjectIssue]>,
+    issues: &[ProjectIssue],
 ) -> Result<(), String> {
     let mut conn = state.0.lock().map_err(|error| error.to_string())?;
     let tx = conn.transaction().map_err(|error| error.to_string())?;
@@ -901,16 +922,7 @@ fn save_analysis(
         "INSERT INTO project_snapshots (project_id,commit_sha,readme,contributing,code_of_conduct,templates_json,detected_tools_json,evidence_json,contribution_brief_json,collection_errors_json,captured_at,generated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,datetime('now'),datetime('now')) ON CONFLICT(project_id) DO UPDATE SET commit_sha=excluded.commit_sha,readme=excluded.readme,contributing=excluded.contributing,code_of_conduct=excluded.code_of_conduct,templates_json=excluded.templates_json,detected_tools_json=excluded.detected_tools_json,evidence_json=excluded.evidence_json,contribution_brief_json=excluded.contribution_brief_json,collection_errors_json=excluded.collection_errors_json,captured_at=datetime('now'),generated_at=datetime('now')",
         params![context.id, sources.commit_sha, sources.readme.as_ref().map(|doc| &doc.content), sources.contributing.as_ref().map(|doc| &doc.content), sources.code_of_conduct.as_ref().map(|doc| &doc.content), serde_json::to_string(&sources.templates).map_err(|error| error.to_string())?, serde_json::to_string(tools).map_err(|error| error.to_string())?, serde_json::to_string(&brief.evidence).map_err(|error| error.to_string())?, serde_json::to_string(brief).map_err(|error| error.to_string())?, serde_json::to_string(&sources.errors).map_err(|error| error.to_string())?],
     ).map_err(|error| error.to_string())?;
-    if let Some(issues) = issues {
-        tx.execute(
-            "DELETE FROM project_issues WHERE project_id=?1",
-            [&context.id],
-        )
-        .map_err(|error| error.to_string())?;
-        for issue in issues {
-            tx.execute("INSERT INTO project_issues (github_issue_id,project_id,number,title,body,html_url,labels_json,state,author_login,is_pull_request,comments_count,updated_at,cached_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,datetime('now'))", params![issue.github_issue_id,issue.project_id,issue.number,issue.title,issue.body,issue.html_url,serde_json::to_string(&issue.labels).unwrap_or_default(),issue.state,issue.author_login,issue.is_pull_request as i64,issue.comments_count,issue.updated_at]).map_err(|error| error.to_string())?;
-        }
-    }
+    replace_issue_sample(&tx, &context.id, issues)?;
     tx.execute(
         "UPDATE projects SET updated_at=datetime('now') WHERE id=?1",
         [&context.id],
@@ -1004,6 +1016,10 @@ pub async fn analyze_project_contribution(
         sources.errors.push(
             "No README, contribution guide, template, or supported manifest was found.".into(),
         );
+    } else if context.full_name.is_none() {
+        sources
+            .errors
+            .push("AI brief skipped for a local-only or unverified project.".into());
     } else {
         match get_llm_settings() {
             Ok(settings) => match call_llm(
@@ -1029,14 +1045,7 @@ pub async fn analyze_project_contribution(
                 .push(format!("AI brief unavailable: {error}")),
         }
     }
-    save_analysis(
-        &state,
-        &context,
-        &sources,
-        &tools,
-        &brief,
-        fetched_issues.as_deref(),
-    )?;
+    save_analysis(&state, &context, &sources, &tools, &brief, issues)?;
     load_contribution_inner(&state, &project_id)?
         .ok_or_else(|| "Saved analysis could not be loaded.".into())
 }
@@ -1055,6 +1064,60 @@ mod tests {
             std::env::temp_dir().join(format!("eunha-{label}-{}-{suffix}", std::process::id()));
         fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    fn cached_issue(id: i64) -> ProjectIssue {
+        ProjectIssue {
+            github_issue_id: id,
+            project_id: "github:owner/repo".into(),
+            number: id,
+            title: format!("Issue {id}"),
+            body: Some("Context".into()),
+            html_url: format!("https://github.com/owner/repo/issues/{id}"),
+            labels: vec![],
+            state: "open".into(),
+            author_login: None,
+            is_pull_request: false,
+            comments_count: 0,
+            updated_at: None,
+        }
+    }
+
+    #[test]
+    fn issue_refresh_keeps_metadata_referenced_by_a_task() {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::migrations::run(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO projects (id,display_name) VALUES ('github:owner/repo','repo')",
+            [],
+        )
+        .unwrap();
+        for issue in [cached_issue(1), cached_issue(2)] {
+            conn.execute(
+                "INSERT INTO project_issues (github_issue_id,project_id,number,title,html_url,state) VALUES (?1,?2,?3,?4,?5,?6)",
+                params![issue.github_issue_id,issue.project_id,issue.number,issue.title,issue.html_url,issue.state],
+            )
+            .unwrap();
+        }
+        conn.execute(
+            "INSERT INTO contribution_tasks (id,project_id,issue_id,title) VALUES ('task:1','github:owner/repo',1,'Keep context')",
+            [],
+        )
+        .unwrap();
+
+        let tx = conn.transaction().unwrap();
+        replace_issue_sample(&tx, "github:owner/repo", &[cached_issue(3)]).unwrap();
+        tx.commit().unwrap();
+
+        let mut statement = conn
+            .prepare("SELECT github_issue_id FROM project_issues ORDER BY github_issue_id")
+            .unwrap();
+        let ids = statement
+            .query_map([], |row| row.get::<_, i64>(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(ids, vec![1, 3]);
     }
 
     #[test]

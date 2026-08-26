@@ -60,22 +60,11 @@ pub fn get_secret(key: &str) -> Option<String> {
 
 pub fn set_secret(key: &str, value: &str) -> Result<(), String> {
     let mut config = read();
+    let value = (!value.is_empty()).then(|| value.to_string());
     match key {
-        "github_pat" => config.github_pat = Some(value.to_string()),
-        "llm_api_key" => config.llm_api_key = Some(value.to_string()),
+        "github_pat" => config.github_pat = value,
+        "llm_api_key" => config.llm_api_key = value,
         _ => return Err(format!("Unknown secret key: {key}")),
     }
-    write(&config)
-}
-
-
-
-pub fn get_onboarded_at() -> Option<String> {
-    read().onboarded_at.filter(|s| !s.is_empty())
-}
-
-pub fn set_onboarded_at(value: &str) -> Result<(), String> {
-    let mut config = read();
-    config.onboarded_at = Some(value.to_string());
     write(&config)
 }

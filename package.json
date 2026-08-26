@@ -1,5 +1,5 @@
 {
-	"name": "tauri-app",
+	"name": "eunha",
 	"private": true,
 	"version": "0.1.0",
 	"type": "module",
@@ -12,21 +12,10 @@
 		"tauri": "tauri"
 	},
 	"dependencies": {
-		"@conduit/core": "link:../conduit/packages/core",
-		"@conduit/react": "link:../conduit/packages/react",
-		"@tailwindcss/vite": "^4.2.4",
-		"@tanstack/react-virtual": "^3.13.24",
 		"@tauri-apps/api": "^2",
-		"@tauri-apps/plugin-clipboard-manager": "^2.3.2",
 		"@tauri-apps/plugin-opener": "^2",
 		"react": "^19.1.0",
-		"react-dom": "^19.1.0",
-		"react-force-graph-2d": "^1.29.1",
-		"react-markdown": "^10.1.0",
-		"rehype-raw": "^7.0.0",
-		"rehype-sanitize": "^6.0.0",
-		"remark-gfm": "^4.0.1",
-		"tailwindcss": "^4.2.4"
+		"react-dom": "^19.1.0"
 	},
 	"devDependencies": {
 		"@tauri-apps/cli": "^2",
@@ -35,5 +24,6 @@
 		"@vitejs/plugin-react": "^4.6.0",
 		"typescript": "~5.8.3",
 		"vite": "^7.0.4"
-	}
+	},
+	"packageManager": "pnpm@10.34.5+sha512.a4ee05f2f73658255bd6a89859c065a45c28a57daefae2c893a168ee2b73168c37b91e83e57ea67654ad03f03031746430e8bce38e362e042605fb8abc80192e"
 }

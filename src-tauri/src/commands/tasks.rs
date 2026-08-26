@@ -10,7 +10,9 @@ use tauri::State;
 
 const TASK_SELECT: &str = "
     SELECT t.id,t.project_id,p.display_name,p.github_full_name,t.issue_id,i.number,i.html_url,
-           t.workspace_id,t.title,t.status,t.branch_name,t.notes,t.created_at,t.updated_at
+           t.workspace_id,t.title,t.status,t.branch_name,t.notes,
+           strftime('%Y-%m-%dT%H:%M:%SZ',t.created_at),
+           strftime('%Y-%m-%dT%H:%M:%SZ',t.updated_at)
     FROM contribution_tasks t
     JOIN projects p ON p.id=t.project_id
     LEFT JOIN project_issues i ON i.github_issue_id=t.issue_id";
@@ -55,8 +57,6 @@ fn valid_transition(from: &str, to: &str) -> bool {
         ("candidate", "selected")
             | ("selected", "preparing")
             | ("preparing", "in_progress")
-            | ("in_progress", "ready_for_pr")
-            | ("ready_for_pr", "submitted")
             | ("blocked", "selected")
             | ("blocked", "preparing")
             | ("blocked", "in_progress")
@@ -160,14 +160,14 @@ pub fn update_task_status(
 ) -> Result<ContributionTask, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let current = get_task(&conn, &task_id)?;
+    if matches!(status.as_str(), "ready_for_pr" | "submitted") {
+        return Err("PR readiness states require the Phase 4 readiness flow.".into());
+    }
     if !valid_transition(&current.status, &status) {
         return Err(format!(
             "Task cannot move from {} to {}.",
             current.status, status
         ));
-    }
-    if status == "submitted" {
-        return Err("Confirm PR submission from the PR readiness flow.".into());
     }
     conn.execute(
         "UPDATE contribution_tasks SET status=?1,updated_at=datetime('now') WHERE id=?2",
@@ -204,7 +204,7 @@ fn workspace_for_task(
     task: &ContributionTask,
 ) -> Result<Option<Workspace>, String> {
     conn.query_row(
-        "SELECT id,project_id,local_path,default_branch,current_branch,head_sha,git_status_json,last_scanned_at
+        "SELECT id,project_id,local_path,default_branch,current_branch,head_sha,git_status_json,strftime('%Y-%m-%dT%H:%M:%SZ',last_scanned_at)
          FROM workspaces WHERE id=?1",
         [task.workspace_id.as_deref().unwrap_or("")],
         |row| {
@@ -333,23 +333,28 @@ pub fn create_task_branch(
     let canonical = PathBuf::from(&workspace.local_path)
         .canonicalize()
         .map_err(|_| "The connected workspace is no longer accessible.".to_string())?;
-    let (root, default_branch, _) = inspect_workspace(&canonical)?;
+    let (root, default_branch, before) = inspect_workspace(&canonical)?;
     if root.to_string_lossy() != workspace.local_path {
         return Err("The workspace path no longer resolves to its saved Git root.".into());
     }
     git_output(&root, &["check-ref-format", "--branch", &branch_name])
         .map_err(|_| "Git rejected this branch name.".to_string())?;
-    git_output(&root, &["switch", "-c", &branch_name])?;
+    if before.branch.as_deref() != Some(branch_name.as_str()) {
+        git_output(&root, &["switch", "-c", &branch_name])?;
+    }
     let (_, _, status) = inspect_workspace(&root)?;
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.execute(
+    let status_json = serde_json::to_string(&status).map_err(|e| e.to_string())?;
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute(
         "UPDATE workspaces SET default_branch=COALESCE(?1,default_branch),current_branch=?2,head_sha=?3,git_status_json=?4,last_scanned_at=datetime('now') WHERE id=?5",
-        params![default_branch, status.branch, status.head_sha, serde_json::to_string(&status).map_err(|e| e.to_string())?, workspace.id],
+        params![default_branch, status.branch, status.head_sha, status_json, workspace.id],
     ).map_err(|e| e.to_string())?;
-    conn.execute(
+    tx.execute(
         "UPDATE contribution_tasks SET branch_name=?1,status='in_progress',updated_at=datetime('now') WHERE id=?2",
         params![branch_name, task_id],
     ).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     drop(conn);
     get_task_workspace(task_id, state)
 }
@@ -361,8 +366,8 @@ mod tests {
     #[test]
     fn task_state_machine_rejects_skips() {
         assert!(valid_transition("selected", "preparing"));
-        assert!(valid_transition("in_progress", "ready_for_pr"));
         assert!(valid_transition("in_progress", "blocked"));
+        assert!(!valid_transition("in_progress", "ready_for_pr"));
         assert!(!valid_transition("selected", "ready_for_pr"));
         assert!(!valid_transition("submitted", "in_progress"));
     }

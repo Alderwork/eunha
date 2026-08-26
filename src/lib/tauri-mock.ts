@@ -1,541 +1,407 @@
-/**
- * Browser-preview shim for the Tauri APIs eunha uses.
- *
- * Vite aliases the real `@tauri-apps/*` modules here ONLY when the dev server
- * was not spawned by the Tauri CLI (see vite.config.ts). Under `pnpm dev` in a
- * plain browser, `invoke()` resolves against `public/mock-data.json` — real
- * library data exported by `scripts/export-mock-data.mjs` — falling back to a
- * tiny built-in fixture when the export is missing.
- *
- * Everything is in-memory: mutations (watch toggle, notes, collections) mutate
- * local state so the UI behaves, but nothing persists. LLM / GitHub commands
- * fail with a clear "browser preview" error instead of silently succeeding.
- */
 import type {
-	Collection,
-	FeedGroup,
-	Project,
-	ProjectContribution,
-	ProjectDraft,
-	Repo,
-	SimilarRepo,
-	WatchedRepoEntry,
+  ContributionTask,
+  Project,
+  ProjectContribution,
+  ProjectDraft,
+  ProjectIssue,
+  TaskStatus,
+  TaskWorkspace,
+  Workspace,
 } from '../types';
 
-interface MockData {
-	exported_at: string;
-	repos: Repo[];
-	collections: Collection[];
-	collectionItems: { collection_id: number; repo_id: string }[];
-	releases: {
-		id: string;
-		repo_id: string;
-		tag_name: string;
-		name: string | null;
-		body: string | null;
-		html_url: string;
-		published_at: string;
-		read_at: string | null;
-	}[];
-	feedItems: {
-		repo_full_name: string;
-		repo_description: string | null;
-		repo_url: string;
-		repo_language: string | null;
-		repo_stars_count: number | null;
-		repo_topics: string | null;
-		starred_by: string;
-		starred_at: string;
-		dismissed: number;
-		added_to_library: number;
-	}[];
-}
+const now = new Date().toISOString();
 
-const CURRENT_PROMPT_VERSION = 1;
-
-const previewProjects: Project[] = [
-	{
-		id: 'github:openai/codex',
-		github_full_name: 'openai/codex',
-		remote_url: 'https://github.com/openai/codex',
-		display_name: 'codex',
-		description: 'Lightweight coding agent that runs in your terminal.',
-		default_branch: 'main',
-		role_mode: 'contributor',
-		created_at: '2026-08-24 09:00:00',
-		updated_at: '2026-08-24 09:00:00',
-		workspace: {
-			id: 'workspace:/Users/jgo/Developer/codex',
-			project_id: 'github:openai/codex',
-			local_path: '/Users/jgo/Developer/codex',
-			default_branch: 'main',
-			current_branch: 'docs/contribution-brief',
-			head_sha: '5d91a7430a18dc21',
-			git_status: { branch: 'docs/contribution-brief', head_sha: '5d91a7430a18dc21', changed_files: ['docs/contributing.md', 'README.md'], staged: 1, unstaged: 1, untracked: 0, clean: false },
-			last_scanned_at: new Date().toISOString(),
-		},
-	},
-];
-
-const fixture: MockData = {
-	exported_at: new Date().toISOString(),
-	repos: [
-		{
-			id: 'facebook/react',
-			full_name: 'facebook/react',
-			description: 'The library for web and native user interfaces.',
-			url: 'https://github.com/facebook/react',
-			language: 'JavaScript',
-			stars_count: 230000,
-			topics: '["react","ui","frontend"]',
-			added_at: '2026-07-01 10:00:00',
-			source: 'starred',
-			llm_summary: null,
-			llm_what: 'Declarative UI library for web and native apps',
-			llm_why: 'Component model + huge ecosystem make it the default',
-			llm_use_case: 'Building interactive web app frontends',
-			llm_category: 'Library',
-			llm_tags: '["ui","components","frontend"]',
-			llm_generated_at: '2026-07-02 10:00:00',
-			prompt_version: 1,
-			user_notes: null,
-			user_category: null,
-			watching: true,
-			category_locked: false,
-			owner_avatar_url: 'https://avatars.githubusercontent.com/u/69631?v=4',
-		},
-		{
-			id: 'tauri-apps/tauri',
-			full_name: 'tauri-apps/tauri',
-			description: 'Build smaller, faster, and more secure desktop and mobile applications.',
-			url: 'https://github.com/tauri-apps/tauri',
-			language: 'Rust',
-			stars_count: 90000,
-			topics: '["rust","desktop","webview"]',
-			added_at: '2026-06-15 10:00:00',
-			source: 'starred',
-			llm_summary: null,
-			llm_what: null,
-			llm_why: null,
-			llm_use_case: null,
-			llm_category: null,
-			llm_tags: null,
-			llm_generated_at: null,
-			prompt_version: null,
-			user_notes: null,
-			user_category: null,
-			watching: false,
-			category_locked: false,
-			owner_avatar_url: 'https://avatars.githubusercontent.com/u/46426891?v=4',
-		},
-	],
-	collections: [
-		{
-			id: 1,
-			name: 'Read Later',
-			description: null,
-			icon: '📌',
-			sort_order: 0,
-			is_read_later: true,
-			repo_count: 1,
-			created_at: '2026-07-01 10:00:00',
-		},
-	],
-	collectionItems: [{ collection_id: 1, repo_id: 'facebook/react' }],
-	releases: [],
-	feedItems: [],
+const workspace: Workspace = {
+  id: 'workspace:/Users/jgo/Developer/codex',
+  project_id: 'github:openai/codex',
+  local_path: '/Users/jgo/Developer/codex',
+  default_branch: 'main',
+  current_branch: 'docs/contribution-brief',
+  head_sha: '5d91a7430a18dc21',
+  git_status: {
+    branch: 'docs/contribution-brief',
+    head_sha: '5d91a7430a18dc21',
+    changed_files: ['docs/contributing.md', 'README.md'],
+    staged: 1,
+    unstaged: 1,
+    untracked: 0,
+    clean: false,
+  },
+  last_scanned_at: now,
 };
 
-const dataPromise: Promise<MockData> = fetch('/mock-data.json')
-	.then((r) => {
-		if (!r.ok) throw new Error(`mock-data.json: HTTP ${r.status}`);
-		return r.json() as Promise<MockData>;
-	})
-	.catch((e) => {
-		console.warn(
-			'[tauri-mock] using built-in fixture (run `node scripts/export-mock-data.mjs` for real data):',
-			e,
-		);
-		return fixture;
-	});
+const projects: Project[] = [{
+  id: 'github:openai/codex',
+  github_full_name: 'openai/codex',
+  remote_url: 'https://github.com/openai/codex',
+  display_name: 'codex',
+  description: 'A lightweight coding agent that runs in your terminal.',
+  default_branch: 'main',
+  role_mode: 'contributor',
+  created_at: now,
+  updated_at: now,
+  workspace,
+}];
 
-function previewOnly(what: string): never {
-	throw new Error(`${what} is not available in the browser preview — run \`pnpm tauri dev\`.`);
+const issues: ProjectIssue[] = [
+  {
+    github_issue_id: 101,
+    project_id: projects[0].id,
+    number: 8421,
+    title: 'Improve first-run setup diagnostics',
+    body: 'Make setup failures actionable.',
+    html_url: 'https://github.com/openai/codex/issues/8421',
+    labels: ['good first issue', 'help wanted'],
+    state: 'open',
+    author_login: 'maintainer',
+    is_pull_request: false,
+    comments_count: 4,
+    updated_at: now,
+  },
+  {
+    github_issue_id: 102,
+    project_id: projects[0].id,
+    number: 8390,
+    title: 'Document local model configuration',
+    body: null,
+    html_url: 'https://github.com/openai/codex/issues/8390',
+    labels: ['documentation'],
+    state: 'open',
+    author_login: 'contributor',
+    is_pull_request: false,
+    comments_count: 2,
+    updated_at: now,
+  },
+  {
+    github_issue_id: 103,
+    project_id: projects[0].id,
+    number: 8401,
+    title: 'Refine command approval messaging',
+    body: null,
+    html_url: 'https://github.com/openai/codex/pull/8401',
+    labels: ['ui'],
+    state: 'open',
+    author_login: 'contributor',
+    is_pull_request: true,
+    comments_count: 6,
+    updated_at: now,
+  },
+];
+
+const contribution: ProjectContribution = {
+  snapshot: {
+    project_id: projects[0].id,
+    commit_sha: workspace.head_sha,
+    readme: '# Codex\nA lightweight coding agent.',
+    contributing: 'Run cargo test before opening a pull request.',
+    code_of_conduct: null,
+    templates: [{ source: '.github/ISSUE_TEMPLATE/bug.yml', content: 'name: Bug report' }],
+    detected_tools: [{
+      source: 'Cargo.toml',
+      name: 'Rust / Cargo',
+      commands: ['cargo test', 'cargo fmt --check', 'cargo clippy --all-targets'],
+    }],
+    evidence: [{
+      source: 'CONTRIBUTING.md',
+      excerpt: 'Run cargo test before opening a pull request.',
+    }],
+    contribution_brief: {
+      project_definition: 'A coding agent that helps developers work with repositories from the terminal.',
+      contributor_entry_points: [
+        'Start with CONTRIBUTING.md.',
+        'Review issues labeled good first issue or help wanted.',
+      ],
+      setup_requirements: ['Rust / Cargo configuration is declared in Cargo.toml.'],
+      verification_commands: ['cargo test', 'cargo fmt --check', 'cargo clippy --all-targets'],
+      contribution_rules: ['Run the documented checks before opening a pull request.'],
+      maturity_signals: ['The current GitHub sample contains two open issues and one open pull request.'],
+      cautions: ['The code of conduct was not found in the collected sources.'],
+      evidence: [
+        {
+          source: 'CONTRIBUTING.md',
+          excerpt: 'Run cargo test before opening a pull request.',
+        },
+        { source: 'README.md', excerpt: 'A lightweight coding agent.' },
+      ],
+      unknowns: ['Required Rust toolchain version was not stated in the collected excerpts.'],
+    },
+    collection_errors: ['CODE_OF_CONDUCT was not found.'],
+    captured_at: now,
+    generated_at: now,
+  },
+  issues,
+};
+
+const tasks: ContributionTask[] = [{
+  id: 'task:preview',
+  project_id: projects[0].id,
+  project_name: projects[0].display_name,
+  github_full_name: projects[0].github_full_name,
+  issue_id: issues[0].github_issue_id,
+  issue_number: issues[0].number,
+  issue_url: issues[0].html_url,
+  workspace_id: workspace.id,
+  title: issues[0].title,
+  status: 'in_progress',
+  branch_name: 'fix/setup-diagnostics',
+  notes: 'Trace the first-run error path and keep the message actionable.',
+  created_at: now,
+  updated_at: now,
+}];
+
+function findProject(id: unknown): Project {
+  const project = projects.find((item) => item.id === id);
+  if (!project) throw new Error('Project not found.');
+  return project;
 }
 
-function matchesQuery(r: Repo, q: string | null | undefined): boolean {
-	const needle = (q ?? '').trim().toLowerCase();
-	if (!needle) return true;
-	const hay = [
-		r.full_name,
-		r.description,
-		r.llm_what,
-		r.llm_why,
-		r.llm_use_case,
-		r.llm_category,
-		r.llm_tags,
-		r.user_notes,
-	]
-		.filter(Boolean)
-		.join('\n')
-		.toLowerCase();
-	return needle.split(/\s+/).every((w) => hay.includes(w));
+function findTask(id: unknown): ContributionTask {
+  const task = tasks.find((item) => item.id === id);
+  if (!task) throw new Error('Task not found.');
+  return task;
 }
 
-function matchesCategory(r: Repo, category: string | null | undefined): boolean {
-	if (!category) return true;
-	return (r.user_category ?? r.llm_category) === category;
+function taskWorkspace(task: ContributionTask): TaskWorkspace {
+  const project = findProject(task.project_id);
+  const connected = project.workspace;
+  return {
+    task,
+    workspace: connected,
+    issue_body: issues.find((issue) => issue.github_issue_id === task.issue_id)?.body ?? null,
+    verification_commands: contribution.snapshot.contribution_brief?.verification_commands ?? [],
+    git: connected ? {
+      status: connected.git_status,
+      diff_stat: 'README.md | 3 ++-',
+      staged_diff_stat: 'docs/contributing.md | 6 ++++++',
+      recent_commits: [
+        {
+          sha: connected.head_sha ?? '5d91a743',
+          summary: 'Clarify contribution setup',
+          author: 'Preview User',
+          authored_at: now,
+        },
+      ],
+    } : null,
+  };
 }
 
-function matchesAiStatus(r: Repo, status: string | null | undefined): boolean {
-	switch (status) {
-		case 'undescribed':
-			return r.llm_summary == null;
-		case 'stale':
-			return r.llm_summary != null && (r.prompt_version ?? 0) < CURRENT_PROMPT_VERSION;
-		case 'described':
-			return r.llm_summary != null && (r.prompt_version ?? 0) >= CURRENT_PROMPT_VERSION;
-		default:
-			return true;
-	}
+let githubPat = 'github_pat_••••••••••••demo';
+let conduitActive: string | null = null;
+let conduitConnections: Record<string, unknown>[] = [];
+
+function patSettings() {
+  return {
+    pat_set: Boolean(githubPat),
+    pat_masked: githubPat ? '•'.repeat(Math.min(24, Math.max(0, githubPat.length - 4))) + githubPat.slice(-4) : '',
+  };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function invoke<T>(cmd: string, args?: Record<string, any>): Promise<T> {
-	const data = await dataPromise;
-	const a = args ?? {};
-
-	switch (cmd) {
-		// ── Local workspace pivot ─────────────────────────────
-		case 'list_projects':
-			return previewProjects as T;
-		case 'get_project':
-			return previewProjects.find((project) => project.id === a.projectId) as T;
-		case 'refresh_project_workspace':
-			return previewProjects.find((project) => project.id === a.projectId) as T;
-		case 'set_project_role': {
-			const project = previewProjects.find((item) => item.id === a.projectId);
-			if (project) project.role_mode = a.roleMode;
-			return project as T;
-		}
-		case 'inspect_project_input': {
-			const fullName = String(a.input).replace(/^https?:\/\/(www\.)?github\.com\//, '').replace(/\.git\/?$/, '').replace(/\/$/, '');
-			if (!/^[-\w.]+\/[-\w.]+$/.test(fullName)) previewOnly('Local Git inspection');
-			const name = fullName.split('/')[1];
-			return { github_full_name: fullName, remote_url: `https://github.com/${fullName}`, display_name: name, description: 'Public GitHub repository ready to become an eunha project.', local_path: null, clone_suggestion: `/Users/jgo/Developer/${name}`, workspace_status: null, default_branch: 'main', warnings: ['No local workspace is connected yet. Clone remains a user-approved action.'] } as ProjectDraft as T;
-		}
-		case 'save_project': {
-			const draft = a.draft as ProjectDraft;
-			const project: Project = { id: draft.github_full_name ? `github:${draft.github_full_name}` : `local:${draft.local_path}`, github_full_name: draft.github_full_name, remote_url: draft.remote_url, display_name: draft.display_name, description: draft.description, default_branch: draft.default_branch, role_mode: a.roleMode, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), workspace: null };
-			previewProjects.unshift(project);
-			return project as T;
-		}
-		case 'get_project_contribution':
-		case 'analyze_project_contribution': {
-			const projectId = String(a.projectId);
-			return {
-				snapshot: {
-					project_id: projectId,
-					commit_sha: '5d91a7430a18dc21',
-					readme: '# Codex\nA lightweight coding agent.',
-					contributing: 'Run cargo test before opening a pull request.',
-					code_of_conduct: null,
-					templates: [{ source: '.github/ISSUE_TEMPLATE/bug.yml', content: 'name: Bug report' }],
-					detected_tools: [{ source: 'Cargo.toml', name: 'Rust / Cargo', commands: ['cargo test', 'cargo fmt --check', 'cargo clippy --all-targets'] }],
-					evidence: [{ source: 'CONTRIBUTING.md', excerpt: 'Run cargo test before opening a pull request.' }],
-					contribution_brief: {
-						project_definition: 'A lightweight coding agent that runs in the terminal and helps developers work with repositories.',
-						contributor_entry_points: ['Start with CONTRIBUTING.md.', 'Review open issues labeled good first issue or help wanted.'],
-						setup_requirements: ['Rust / Cargo configuration is declared in Cargo.toml.'],
-						verification_commands: ['cargo test', 'cargo fmt --check', 'cargo clippy --all-targets'],
-						contribution_rules: ['Run the documented checks before opening a pull request.'],
-						maturity_signals: ['The current GitHub sample contains 2 open issues and 1 open pull request.'],
-						cautions: ['The code of conduct was not found in the collected sources.'],
-						evidence: [{ source: 'CONTRIBUTING.md', excerpt: 'Run cargo test before opening a pull request.' }, { source: 'README.md', excerpt: 'A lightweight coding agent.' }],
-						unknowns: ['Required Rust toolchain version was not stated in the collected excerpts.'],
-					},
-					collection_errors: ['CODE_OF_CONDUCT was not found.'],
-					captured_at: new Date().toISOString(),
-					generated_at: new Date().toISOString(),
-				},
-				issues: [
-					{ github_issue_id: 101, project_id: projectId, number: 8421, title: 'Improve first-run setup diagnostics', body: 'Make setup failures actionable.', html_url: 'https://github.com/openai/codex/issues/8421', labels: ['good first issue', 'help wanted'], state: 'open', author_login: 'maintainer', is_pull_request: false, comments_count: 4, updated_at: new Date().toISOString() },
-					{ github_issue_id: 102, project_id: projectId, number: 8390, title: 'Document local model configuration', body: null, html_url: 'https://github.com/openai/codex/issues/8390', labels: ['documentation'], state: 'open', author_login: 'contributor', is_pull_request: false, comments_count: 2, updated_at: new Date().toISOString() },
-					{ github_issue_id: 103, project_id: projectId, number: 8401, title: 'Refine command approval messaging', body: null, html_url: 'https://github.com/openai/codex/pull/8401', labels: ['ui'], state: 'open', author_login: 'contributor', is_pull_request: true, comments_count: 6, updated_at: new Date().toISOString() },
-				],
-			} as ProjectContribution as T;
-		}
-		// ── Library ──────────────────────────────────────────
-		case 'list_repos': {
-			const out = data.repos.filter(
-				(r) =>
-					matchesQuery(r, a.query) &&
-					matchesCategory(r, a.category) &&
-					matchesAiStatus(r, a.aiStatus),
-			);
-			return out as T;
-		}
-		case 'get_collection_repos': {
-			const ids = new Set(
-				data.collectionItems
-					.filter((ci) => ci.collection_id === a.collectionId)
-					.map((ci) => ci.repo_id),
-			);
-			const out = data.repos.filter(
-				(r) => ids.has(r.id) && matchesQuery(r, a.query) && matchesCategory(r, a.category),
-			);
-			return out as T;
-		}
-		case 'get_categories': {
-			const counts = new Map<string, number>();
-			for (const r of data.repos) {
-				const cat = r.user_category ?? r.llm_category;
-				if (cat) counts.set(cat, (counts.get(cat) ?? 0) + 1);
-			}
-			return [...counts.entries()]
-				.map(([category, count]) => ({ category, count }))
-				.sort((x, y) => y.count - x.count) as T;
-		}
-		case 'get_app_constants':
-			return { current_prompt_version: CURRENT_PROMPT_VERSION } as T;
-		case 'update_repo_user_fields': {
-			const repo = data.repos.find((r) => r.id === a.repoId);
-			if (!repo) throw new Error(`repo not found: ${a.repoId}`);
-			if ('userNotes' in a) repo.user_notes = a.userNotes;
-			if ('userCategory' in a) repo.user_category = a.userCategory;
-			return repo as T;
-		}
-		case 'set_category_lock': {
-			const repo = data.repos.find((r) => r.id === a.repoId);
-			if (!repo) throw new Error(`repo not found: ${a.repoId}`);
-			repo.category_locked = !!a.locked;
-			return repo as T;
-		}
-		case 'toggle_watching': {
-			const repo = data.repos.find((r) => r.id === a.repoId);
-			if (!repo) throw new Error(`repo not found: ${a.repoId}`);
-			repo.watching = !repo.watching;
-			return repo as T;
-		}
-		case 'record_engagement':
-			return null as T;
-
-		// ── Collections ──────────────────────────────────────
-		case 'list_collections': {
-			for (const c of data.collections) {
-				c.repo_count = data.collectionItems.filter((ci) => ci.collection_id === c.id).length;
-			}
-			return data.collections as T;
-		}
-		case 'get_repo_collections': {
-			const ids = data.collectionItems
-				.filter((ci) => ci.repo_id === a.repoId)
-				.map((ci) => ci.collection_id);
-			return data.collections.filter((c) => ids.includes(c.id)) as T;
-		}
-		case 'add_repo_to_collection': {
-			if (
-				!data.collectionItems.some(
-					(ci) => ci.collection_id === a.collectionId && ci.repo_id === a.repoId,
-				)
-			) {
-				data.collectionItems.push({ collection_id: a.collectionId, repo_id: a.repoId });
-			}
-			return null as T;
-		}
-		case 'remove_repo_from_collection': {
-			data.collectionItems = data.collectionItems.filter(
-				(ci) => !(ci.collection_id === a.collectionId && ci.repo_id === a.repoId),
-			);
-			return null as T;
-		}
-		case 'create_collection': {
-			const id = Math.max(0, ...data.collections.map((c) => c.id)) + 1;
-			const col: Collection = {
-				id,
-				name: a.name,
-				description: null,
-				icon: a.icon ?? null,
-				sort_order: id,
-				is_read_later: false,
-				repo_count: 0,
-				created_at: new Date().toISOString(),
-			};
-			data.collections.push(col);
-			return col as T;
-		}
-
-		// ── Watching / releases ──────────────────────────────
-		case 'list_watched_repos_with_unread': {
-			const out: WatchedRepoEntry[] = data.repos
-				.filter((r) => r.watching)
-				.map((repo) => ({
-					repo,
-					unread: data.releases.filter((rel) => rel.repo_id === repo.id && !rel.read_at).length,
-				}));
-			return out as T;
-		}
-		case 'list_releases':
-			return data.releases.filter((r) => r.repo_id === a.repoId).slice(0, 20) as T;
-		case 'get_unread_release_count':
-			return data.releases.filter((r) => !r.read_at).length as T;
-		case 'mark_release_read': {
-			const rel = data.releases.find((r) => r.id === a.releaseId);
-			if (rel) rel.read_at = new Date().toISOString();
-			return null as T;
-		}
-		case 'mark_all_releases_read': {
-			for (const r of data.releases) r.read_at = r.read_at ?? new Date().toISOString();
-			return null as T;
-		}
-		case 'sync_releases':
-			return { checked: 0, new_releases: 0, failed_repos: [] } as T;
-
-		// ── Feed ─────────────────────────────────────────────
-		case 'get_feed_items': {
-			const inLib = new Set(data.repos.map((r) => r.full_name));
-			const groups = new Map<string, FeedGroup>();
-			for (const item of data.feedItems) {
-				const g = groups.get(item.repo_full_name);
-				if (g) {
-					g.starred_by.push(item.starred_by);
-					if (item.starred_at > g.latest_starred_at) g.latest_starred_at = item.starred_at;
-				} else {
-					groups.set(item.repo_full_name, {
-						repo_full_name: item.repo_full_name,
-						repo_description: item.repo_description,
-						repo_url: item.repo_url,
-						repo_language: item.repo_language,
-						repo_stars_count: item.repo_stars_count,
-						repo_topics: item.repo_topics,
-						starred_by: [item.starred_by],
-						latest_starred_at: item.starred_at,
-						in_library: inLib.has(item.repo_full_name),
-					});
-				}
-			}
-			return [...groups.values()] as T;
-		}
-		case 'get_feed_unread_count':
-			return data.feedItems.filter((f) => !f.dismissed).length as T;
-		case 'dismiss_feed_item':
-			return null as T;
-		case 'fetch_feed':
-			previewOnly('Feed fetch');
-
-		// ── Digest / discovery ───────────────────────────────
-		case 'get_launch_digest':
-		case 'get_current_digest':
-			return null as T;
-		case 'record_digest_action':
-			return null as T;
-		case 'get_similar_repos':
-			return [] as SimilarRepo[] as T;
-		case 'get_contribution_data':
-			return null as T;
-		case 'fetch_trending':
-			return [] as T;
-
-		// ── Settings / onboarding ────────────────────────────
-		case 'get_settings':
-			return {
-				pat_set: true,
-				pat_masked: 'ghp_••••••••••••••••',
-				output_language: 'English',
-				default_release_platform: 'macos-arm64',
-				show_tray_icon: true,
-				star_sync_interval_minutes: '360',
-				last_star_sync_at: data.exported_at,
-			} as T;
-		case 'save_settings':
-		case 'save_pat':
-		case 'set_onboarded_at':
-		case 'set_tray_visible':
-			return null as T;
-		case 'get_onboarded_at':
-			return '2026-07-01T10:00:00Z' as T;
-		case 'validate_pat':
-			previewOnly('PAT validation');
-		case 'get_my_github_login':
-			return {
-				login: 'preview-user',
-				avatar_url: 'https://avatars.githubusercontent.com/u/9919?v=4',
-			} as T;
-		case 'sync_stars':
-			previewOnly('Star sync');
-		case 'export_database':
-		case 'import_database':
-			previewOnly('Database export/import');
-
-		// ── Conduit (LLM connections) ────────────────────────
-		case 'conduit_list':
-			return { active: null, connections: [] } as T;
-		case 'conduit_save':
-		case 'conduit_delete':
-		case 'conduit_set_active':
-		case 'conduit_http':
-			previewOnly('LLM connections');
-
-		// ── LLM / GitHub actions ─────────────────────────────
-		case 'describe_repo':
-		case 'batch_describe':
-			previewOnly('Describe');
-		case 'import_stars':
-		case 'cancel_import':
-		case 'add_repo':
-			previewOnly('GitHub import');
-		case 'add_feed_repo_to_library':
-			previewOnly('Add to library');
-		case 'fetch_readme':
-			previewOnly('README fetch');
-		case 'cancel_feed_fetch':
-			return null as T;
-		case 'backfill_owner_avatars':
-			return null as T;
-		case 'get_avatar_urls':
-			return {} as T;
-
-		default:
-			console.warn(`[tauri-mock] unhandled command: ${cmd}`, a);
-			return null as T;
-	}
+function isPreviewLocalPath(input: string) {
+  return input === '~'
+    || input.startsWith('/')
+    || input.startsWith('~/')
+    || input.startsWith('./')
+    || input.startsWith('../')
+    || /^[a-zA-Z]:[\\/]/.test(input);
 }
 
-// ── @tauri-apps/api/event ────────────────────────────────
-type EventCallback<T = unknown> = (event: { payload: T }) => void;
-
-export async function listen<T>(
-	event: string,
-	_handler: EventCallback<T>,
-): Promise<() => void> {
-	console.warn(`[tauri-mock] listen("${event}") registered but never fires in browser preview`);
-	return () => {};
+function previewPathName(input: string) {
+  return input
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((part) => part && !['~', '.', '..'].includes(part))
+    .pop() ?? 'local-project';
 }
 
-export async function emit(_event: string, _payload?: unknown): Promise<void> {}
-
-// ── @tauri-apps/api/window ───────────────────────────────
-export function getCurrentWindow() {
-	return {
-		toggleMaximize: () => {
-			if (document.fullscreenElement) void document.exitFullscreen();
-			else void document.documentElement.requestFullscreen();
-		},
-		startDragging: () => {},
-		setVisibleOnAllWorkspaces: async () => {},
-	};
+export async function invoke<T>(
+  command: string,
+  args: Record<string, unknown> = {},
+): Promise<T> {
+  switch (command) {
+    case 'list_projects':
+      return projects as T;
+    case 'get_project':
+    case 'refresh_project_workspace':
+      return findProject(args.projectId) as T;
+    case 'inspect_project_input': {
+      const input = String(args.input ?? '').trim();
+      if (!input) throw new Error('Enter a GitHub repository or local path.');
+      if (isPreviewLocalPath(input)) {
+        const name = previewPathName(input);
+        return {
+          github_full_name: null,
+          remote_url: null,
+          display_name: name,
+          description: null,
+          local_path: input,
+          clone_suggestion: null,
+          workspace_status: workspace.git_status,
+          default_branch: 'main',
+          warnings: ['Browser preview does not inspect the local filesystem.'],
+        } as ProjectDraft as T;
+      }
+      const fullName = input
+        .replace(/^https?:\/\/(www\.)?github\.com\//, '')
+        .replace(/\.git\/?$/, '')
+        .replace(/\/$/, '');
+      if (!/^[-\w.]+\/[-\w.]+$/.test(fullName)) {
+        throw new Error('Enter owner/repo, a GitHub URL, or an absolute local path.');
+      }
+      const name = fullName.split('/')[1];
+      return {
+        github_full_name: fullName,
+        remote_url: 'https://github.com/' + fullName,
+        display_name: name,
+        description: 'Public GitHub repository ready to become an eunha project.',
+        local_path: null,
+        clone_suggestion: '/Users/jgo/Developer/' + name,
+        workspace_status: null,
+        default_branch: 'main',
+        warnings: ['No local workspace is connected yet. Clone remains user-approved.'],
+      } as ProjectDraft as T;
+    }
+    case 'save_project': {
+      const draft = args.draft as ProjectDraft;
+      const project: Project = {
+        id: draft.github_full_name
+          ? 'github:' + draft.github_full_name
+          : 'local:' + draft.local_path,
+        github_full_name: draft.github_full_name,
+        remote_url: draft.remote_url,
+        display_name: draft.display_name,
+        description: draft.description,
+        default_branch: draft.default_branch,
+        role_mode: 'contributor',
+        created_at: now,
+        updated_at: now,
+        workspace: draft.local_path ? {
+          ...workspace,
+          id: 'workspace:' + draft.local_path,
+          project_id: draft.github_full_name
+            ? 'github:' + draft.github_full_name
+            : 'local:' + draft.local_path,
+          local_path: draft.local_path,
+          git_status: draft.workspace_status ?? workspace.git_status,
+        } : null,
+      };
+      projects.unshift(project);
+      return project as T;
+    }
+    case 'get_project_contribution':
+      return args.projectId === contribution.snapshot.project_id ? contribution as T : null as T;
+    case 'analyze_project_contribution':
+      contribution.snapshot.project_id = String(args.projectId);
+      return contribution as T;
+    case 'create_contribution_task': {
+      const project = findProject(args.projectId);
+      const issue = issues.find((item) => item.github_issue_id === args.issueId);
+      const task: ContributionTask = {
+        id: 'task:' + Date.now(),
+        project_id: project.id,
+        project_name: project.display_name,
+        github_full_name: project.github_full_name,
+        issue_id: issue?.github_issue_id ?? null,
+        issue_number: issue?.number ?? null,
+        issue_url: issue?.html_url ?? null,
+        workspace_id: project.workspace?.id ?? null,
+        title: String(args.title ?? '').trim(),
+        status: 'selected',
+        branch_name: null,
+        notes: String(args.notes ?? ''),
+        created_at: now,
+        updated_at: now,
+      };
+      if (!task.title) throw new Error('Task title is required.');
+      tasks.unshift(task);
+      return task as T;
+    }
+    case 'list_contribution_tasks':
+      return tasks as T;
+    case 'get_task_workspace':
+      return taskWorkspace(findTask(args.taskId)) as T;
+    case 'update_task_notes': {
+      const task = findTask(args.taskId);
+      task.notes = String(args.notes ?? '');
+      task.updated_at = new Date().toISOString();
+      return task as T;
+    }
+    case 'update_task_status': {
+      const task = findTask(args.taskId);
+      const status = args.status as TaskStatus;
+      if (status === 'ready_for_pr') throw new Error('PR readiness must be confirmed through the readiness flow.');
+      if (status === 'submitted') throw new Error('PR submission must be confirmed through the PR readiness flow.');
+      task.status = status;
+      task.updated_at = new Date().toISOString();
+      return task as T;
+    }
+    case 'connect_project_workspace': {
+      const project = findProject(args.projectId);
+      const localPath = String(args.localPath ?? '').trim();
+      if (!isPreviewLocalPath(localPath)) throw new Error('Enter an existing local repository path.');
+      project.workspace = {
+        ...workspace,
+        id: 'workspace:' + localPath,
+        project_id: project.id,
+        local_path: localPath,
+      };
+      tasks
+        .filter((task) => task.project_id === project.id)
+        .forEach((task) => { task.workspace_id = project.workspace?.id ?? null; });
+      return project as T;
+    }
+    case 'create_task_branch': {
+      if (args.confirmed !== true) throw new Error('Branch creation requires explicit confirmation.');
+      const task = findTask(args.taskId);
+      const project = findProject(task.project_id);
+      if (!project.workspace) throw new Error('Connect a local workspace first.');
+      const branchName = String(args.branchName ?? '').trim();
+      if (!branchName || /\s/.test(branchName)) throw new Error('Enter a valid branch name.');
+      task.branch_name = branchName;
+      task.status = 'in_progress';
+      task.updated_at = new Date().toISOString();
+      project.workspace.current_branch = branchName;
+      project.workspace.git_status.branch = branchName;
+      return taskWorkspace(task) as T;
+    }
+    case 'get_settings':
+      return patSettings() as T;
+    case 'save_settings':
+      if (args.clearGithubPat === true) githubPat = '';
+      else if (typeof args.githubPat === 'string' && args.githubPat.trim()) githubPat = args.githubPat.trim();
+      return patSettings() as T;
+    case 'conduit_list':
+      return { active: conduitActive, connections: conduitConnections } as T;
+    case 'conduit_save': {
+      const input = args.input as Record<string, unknown>;
+      const id = String(input.provider);
+      const previous = conduitConnections.find((item) => item.id === id);
+      conduitConnections = [
+        {
+          id,
+          provider: id,
+          status: 'configured',
+          key_set: Boolean(input.credentials) || Boolean(previous?.key_set),
+          defaultModel: input.defaultModel,
+          meta: input.meta,
+          createdAt: previous?.createdAt ?? now,
+          updatedAt: new Date().toISOString(),
+        },
+        ...conduitConnections.filter((item) => item.id !== id),
+      ];
+      return null as T;
+    }
+    case 'conduit_delete':
+      conduitConnections = conduitConnections.filter((item) => item.id !== args.id);
+      if (conduitActive === args.id) conduitActive = null;
+      return null as T;
+    case 'conduit_set_active':
+      conduitActive = args.id == null ? null : String(args.id);
+      return null as T;
+    default:
+      throw new Error('Browser preview does not implement ' + command + '.');
+  }
 }
 
-// ── @tauri-apps/plugin-opener ────────────────────────────
 export async function openUrl(url: string): Promise<void> {
-	window.open(url, '_blank', 'noopener,noreferrer');
-}
-
-// ── @tauri-apps/plugin-clipboard-manager ─────────────────
-export async function readText(): Promise<string> {
-	try {
-		return await navigator.clipboard.readText();
-	} catch {
-		return '';
-	}
+  window.open(url, '_blank', 'noopener,noreferrer');
 }

@@ -1,3 +1,5 @@
+// Legacy setting writers stay testable while Star-era rows remain migration-compatible.
+#[allow(dead_code)]
 pub mod migrations;
 
 use rusqlite::{Connection, Result};
